@@ -122,6 +122,7 @@
   .page-photos.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;flex:1;}
   .page-photos.grid1{display:flex;flex:1;}
   .page-photos img{width:100%;height:100%;object-fit:cover;border-radius:4px;}
+  .cover-img{width:100%;height:100%;border-radius:4px;background-size:cover;background-position:center;background-repeat:no-repeat;}
   .page-caption{
     font-family:'Cormorant Garamond',serif;font-style:italic;font-size:14px;color:var(--ink-soft);
     text-align:center;margin-top:12px;padding:0 6px;
@@ -363,7 +364,7 @@ function renderBook(){
     const slots = p.photos.map((id,idx)=>{
       const m = id ? findMedia(id) : null;
       return `<div class="dropslot" data-idx="${idx}" style="height:100%;">
-        ${m ? `<img src="${m.media_url}" />` : `<div class="empty-slot">Зураг сонгоод энд дар</div>`}
+        ${m ? `<div class="cover-img" style="background-image:url('${m.media_url}')"></div>` : `<div class="empty-slot">Зураг сонгоод энд дар</div>`}
       </div>`;
     }).join('');
     inner = `
@@ -471,27 +472,60 @@ document.getElementById('autoBuildBtn').addEventListener('click', autoBuildBook)
 
 // ---- PDF export ----
 async function exportPdf(mode){
-  toast('Ном бэлдэж байна...');
   const isPrint = mode === 'print';
-  // A5 = 148 x 210 mm
-  const pdf = new jspdf.jsPDF({ unit:'mm', format:'a5', orientation:'portrait' });
-  const prevActive = state.activePage;
 
-  for(let i=0;i<state.pages.length;i++){
-    state.activePage = i;
-    renderBook();
-    await new Promise(r=>setTimeout(r,60)); // цаг өгч зураг ачаалуулах
-    const node = document.getElementById('pdfPage');
-    const canvas = await html2canvas(node, { scale: isPrint ? 3 : 2, useCORS:true, backgroundColor:null });
-    const img = canvas.toDataURL('image/jpeg', 0.95);
-    if(i>0) pdf.addPage('a5','portrait');
-    pdf.addImage(img, 'JPEG', 0, 0, 148, 210);
+  if(state.pages.length > 40){
+    const ok = window.confirm(`Энэ ном ${state.pages.length} хуудастай — их хэмжээний PDF үүсгэхэд удаан хугацаа зарцуулагдаж, зарим утсан дээр (ялангуяа iPhone) алдаа гарч болзошгүй. Үргэлжлүүлэх үү? (Багасгах бол Cancel дараад илүү цөөн хуудсаар туршина уу)`);
+    if(!ok) return;
   }
 
-  state.activePage = prevActive;
-  renderBook();
-  pdf.save(isPrint ? 'zuvkhuntuund-ig-nom-hevlekh.pdf' : 'zuvkhuntuund-ig-nom-digital.pdf');
-  toast('Бэлэн боллоо!');
+  // iOS Safari дээр удаан async процессын дараа файл татахад
+  // "WebKitBlobResource" алдаа гардаг тул, товч дарсан мөчид (энэ хэсэг нь
+  // хэрэглэгчийн итгэмжлэгдсэн үйлдлийн цонхонд байгаа) шинэ tab-ыг
+  // урьдчилан нээж, бэлэн болмогц зөвхөн location-ыг нь шинэчилнэ.
+  const preOpenedTab = window.open('', '_blank');
+  if(preOpenedTab){
+    preOpenedTab.document.write('<p style="font-family:sans-serif;padding:24px;color:#555;">Ном бэлдэж байна... энэ хэдэн секунд, олон хуудастай бол хэдэн минут үргэлжилж болно. Хаалгүй хүлээнэ үү.</p>');
+  }
+
+  const prevActive = state.activePage;
+
+  try{
+    // A5 = 148 x 210 mm
+    const pdf = new jspdf.jsPDF({ unit:'mm', format:'a5', orientation:'portrait' });
+
+    for(let i=0;i<state.pages.length;i++){
+      toast(`Бэлдэж байна... ${i+1}/${state.pages.length}`);
+      state.activePage = i;
+      renderBook();
+      await new Promise(r=>setTimeout(r,60)); // цаг өгч зураг ачаалуулах
+      const node = document.getElementById('pdfPage');
+      const canvas = await html2canvas(node, { scale: isPrint ? 2.5 : 1.5, useCORS:true, backgroundColor:null });
+      const img = canvas.toDataURL('image/jpeg', 0.92);
+      if(i>0) pdf.addPage('a5','portrait');
+      pdf.addImage(img, 'JPEG', 0, 0, 148, 210);
+    }
+
+    state.activePage = prevActive;
+    renderBook();
+
+    const filename = isPrint ? 'zuvkhuntuund-ig-nom-hevlekh.pdf' : 'zuvkhuntuund-ig-nom-digital.pdf';
+    const blobUrl = pdf.output('bloburl');
+
+    if(preOpenedTab && !preOpenedTab.closed){
+      preOpenedTab.location.href = blobUrl;
+    } else {
+      // Popup хаагдсан эсвэл blockлогдсон бол энгийн татах аргаар оролдоно
+      pdf.save(filename);
+    }
+    toast('Бэлэн боллоо!');
+  } catch(err){
+    console.error(err);
+    if(preOpenedTab && !preOpenedTab.closed) preOpenedTab.close();
+    toast('Алдаа гарлаа, дахин оролдоно уу');
+    state.activePage = prevActive;
+    renderBook();
+  }
 }
 
 document.getElementById('exportPrint').addEventListener('click', ()=>exportPdf('print'));
