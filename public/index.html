@@ -62,15 +62,22 @@
   .pool p.hint{font-size:12px;color:var(--ink-soft);margin:0 0 14px;}
   .pool-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
   .pool-item{
-    position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;cursor:grab;
-    border:2px solid transparent;
+    position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;cursor:pointer;
+    border:2px solid transparent;transition:.15s;
   }
   .pool-item img{width:100%;height:100%;object-fit:cover;display:block;}
   .pool-item.used{opacity:.35;}
+  .pool-item.selected{border-color:var(--rose-deep);box-shadow:0 0 0 2px var(--rose-deep) inset;}
   .pool-item .tick{
     position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;
     background:var(--sage);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;
   }
+  .dropslot{cursor:pointer;}
+  .select-banner{
+    position:sticky;bottom:10px;background:var(--rose-deep);color:#fff;padding:10px 14px;
+    border-radius:10px;font-size:12.5px;text-align:center;margin-top:10px;display:none;
+  }
+  .select-banner.show{display:block;}
 
   .workspace{padding:24px 28px;overflow-y:auto;}
   .controls-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:22px;}
@@ -194,8 +201,9 @@
 <div class="layout">
   <div class="pool" id="pool">
     <h3>Зургийн сан</h3>
-    <p class="hint">Instagram-аа холбоод зургаа чирж хуудас руу тавина уу.</p>
+    <p class="hint">Зургаа дараад сонгоод, дараа нь хуудасны нүдэн дээр дарж тавина уу.</p>
     <div id="poolGrid" class="pool-grid"></div>
+    <div class="select-banner" id="selectBanner">Сонгосон зураг ✓ — одоо хуудасны нүдэн дээр дарна уу</div>
   </div>
 
   <div class="workspace">
@@ -226,6 +234,7 @@ const state = {
   usedIds: new Set(),
   pages: [], // {layout:'grid2'|'grid1'|'cover', photos:[urlOrNull,...], caption:''}
   activePage: 0,
+  selectedPhotoId: null, // тухайн үед "сонгогдсон" зураг — дараагийн товшилтоор хуудсанд байрлана
 };
 
 function toast(msg){
@@ -263,19 +272,24 @@ async function loadMedia(){
 
 function renderPool(){
   const grid = document.getElementById('poolGrid');
+  const banner = document.getElementById('selectBanner');
+  banner.classList.toggle('show', !!state.selectedPhotoId);
   if(state.media.length === 0){
     grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;padding:20px 4px;">Зураг олдсонгүй.</div>`;
     return;
   }
   grid.innerHTML = state.media.map(m => `
-    <div class="pool-item ${state.usedIds.has(m.id)?'used':''}" draggable="true" data-id="${m.id}">
+    <div class="pool-item ${state.usedIds.has(m.id)?'used':''} ${state.selectedPhotoId===m.id?'selected':''}" data-id="${m.id}">
       <img src="${m.thumbnail_url || m.media_url}" />
       ${state.usedIds.has(m.id) ? '<div class="tick">✓</div>' : ''}
     </div>
   `).join('');
   grid.querySelectorAll('.pool-item').forEach(item=>{
-    item.addEventListener('dragstart', e=>{
-      e.dataTransfer.setData('text/plain', item.dataset.id);
+    item.addEventListener('click', ()=>{
+      const id = item.dataset.id;
+      // Сонгосон зургаа дахин дарвал сонголтыг цуцална
+      state.selectedPhotoId = (state.selectedPhotoId === id) ? null : id;
+      renderPool();
     });
   });
 }
@@ -342,7 +356,7 @@ function renderBook(){
     const slots = p.photos.map((id,idx)=>{
       const m = id ? findMedia(id) : null;
       return `<div class="dropslot" data-idx="${idx}" style="height:100%;">
-        ${m ? `<img src="${m.media_url}" />` : `<div class="empty-slot">Зураг чирж тавих</div>`}
+        ${m ? `<img src="${m.media_url}" />` : `<div class="empty-slot">Зураг сонгоод энд дар</div>`}
       </div>`;
     }).join('');
     inner = `
@@ -355,18 +369,26 @@ function renderBook(){
 
   area.innerHTML = `<div class="book-wrap"><div class="book"><div class="spine"></div>${inner}</div></div>`;
 
-  // drag & drop targets
+  // Дарж сонгох / байрлуулах / арилгах
   area.querySelectorAll('.dropslot').forEach(slot=>{
-    slot.addEventListener('dragover', e=>e.preventDefault());
-    slot.addEventListener('drop', e=>{
-      e.preventDefault();
-      const id = e.dataTransfer.getData('text/plain');
+    slot.addEventListener('click', ()=>{
       const idx = parseInt(slot.dataset.idx);
-      const prev = p.photos[idx];
-      if(prev) state.usedIds.delete(prev);
-      p.photos[idx] = id;
-      state.usedIds.add(id);
-      renderAll();
+      const prevId = p.photos[idx];
+      if(state.selectedPhotoId){
+        // Сонгосон зургийг энэ нүдэнд байрлуулна
+        if(prevId) state.usedIds.delete(prevId);
+        p.photos[idx] = state.selectedPhotoId;
+        state.usedIds.add(state.selectedPhotoId);
+        state.selectedPhotoId = null;
+        renderAll();
+      } else if(prevId){
+        // Сонгосон зураг байхгүй үед бөглөрсөн нүд дарвал зургийг гаргаж авна
+        state.usedIds.delete(prevId);
+        p.photos[idx] = null;
+        renderAll();
+      } else {
+        toast('Эхлээд зүүн талын зургийн сангаас зураг сонгоно уу');
+      }
     });
   });
 
