@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ZuvkhunTuund — Instagram Ном</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  :root{
+    --rose:#B4536B;
+    --rose-deep:#7E2F42;
+    --gold:#C9A65F;
+    --sage:#8A9A7E;
+    --paper:#FBF7F0;
+    --paper-dim:#F1E9DD;
+    --ink:#2B2420;
+    --ink-soft:#6b5f56;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper-dim);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+  }
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px 28px;background:var(--paper);border-bottom:1px solid #e6dcc9;
+    position:sticky;top:0;z-index:50;
+  }
+  .brand{
+    font-family:'Playfair Display',serif;font-weight:700;font-size:20px;color:var(--rose-deep);
+    letter-spacing:.2px;
+  }
+  .brand span{color:var(--gold);font-style:italic;font-family:'Cormorant Garamond',serif;font-weight:500;}
+  .btn{
+    font-family:'Inter',sans-serif;font-weight:600;font-size:13.5px;
+    padding:10px 18px;border-radius:999px;border:none;cursor:pointer;
+    background:var(--rose-deep);color:#fff;transition:.15s;
+  }
+  .btn:hover{background:var(--rose);}
+  .btn.ghost{background:transparent;border:1.5px solid var(--rose-deep);color:var(--rose-deep);}
+  .btn.ghost:hover{background:var(--rose-deep);color:#fff;}
+  .btn.gold{background:var(--gold);color:#3a2e14;}
+  .btn.gold:hover{filter:brightness(1.08);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+
+  .layout{display:grid;grid-template-columns:300px 1fr;min-height:calc(100vh - 66px);}
+  @media(max-width:900px){.layout{grid-template-columns:1fr;}}
+
+  .pool{
+    border-right:1px solid #e6dcc9;padding:20px;background:var(--paper);
+    overflow-y:auto;max-height:calc(100vh - 66px);
+  }
+  .pool h3{
+    font-family:'Playfair Display',serif;font-size:15px;margin:0 0 4px;color:var(--rose-deep);
+  }
+  .pool p.hint{font-size:12px;color:var(--ink-soft);margin:0 0 14px;}
+  .pool-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .pool-item{
+    position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;cursor:grab;
+    border:2px solid transparent;
+  }
+  .pool-item img{width:100%;height:100%;object-fit:cover;display:block;}
+  .pool-item.used{opacity:.35;}
+  .pool-item .tick{
+    position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;
+    background:var(--sage);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;
+  }
+
+  .workspace{padding:24px 28px;overflow-y:auto;}
+  .controls-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:22px;}
+  .seg{display:flex;background:#efe4d2;border-radius:999px;padding:3px;gap:2px;}
+  .seg button{
+    border:none;background:transparent;padding:8px 14px;border-radius:999px;font-size:12.5px;
+    font-weight:600;color:var(--ink-soft);cursor:pointer;font-family:'Inter',sans-serif;
+  }
+  .seg button.active{background:var(--rose-deep);color:#fff;}
+
+  .pages-rail{display:flex;gap:10px;overflow-x:auto;padding:6px 2px 18px;margin-bottom:6px;}
+  .page-chip{
+    flex:0 0 auto;width:64px;height:80px;border-radius:6px;background:#fff;
+    border:2px solid #e6dcc9;display:flex;align-items:center;justify-content:center;
+    font-size:11px;color:var(--ink-soft);cursor:pointer;position:relative;
+  }
+  .page-chip.active{border-color:var(--rose-deep);}
+  .page-chip .del{
+    position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;
+    background:var(--rose-deep);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+  }
+  .page-chip.add{border-style:dashed;font-size:22px;color:var(--gold);}
+
+  .book-wrap{display:flex;justify-content:center;padding:20px 0 40px;}
+  .book{
+    display:flex;box-shadow:0 20px 50px rgba(80,40,30,.18);border-radius:4px;overflow:hidden;
+  }
+  .spine{width:14px;background:linear-gradient(90deg,#00000022,#00000000 40%,#00000000 60%,#00000022);}
+  .page{
+    width:340px;height:480px;background:var(--paper);position:relative;padding:22px;
+    display:flex;flex-direction:column;
+  }
+  .page.cover{
+    background:linear-gradient(160deg,var(--rose-deep),#5c1f2e);color:#fff;
+    align-items:center;justify-content:center;text-align:center;
+  }
+  .page.cover .title{font-family:'Playfair Display',serif;font-size:26px;font-weight:700;margin-bottom:8px;}
+  .page.cover .sub{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:15px;color:#e9c9c9;}
+  .page.cover .gold-line{width:50px;height:2px;background:var(--gold);margin:16px auto;}
+
+  .page-photos.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;flex:1;}
+  .page-photos.grid1{display:flex;flex:1;}
+  .page-photos img{width:100%;height:100%;object-fit:cover;border-radius:4px;}
+  .page-caption{
+    font-family:'Cormorant Garamond',serif;font-style:italic;font-size:14px;color:var(--ink-soft);
+    text-align:center;margin-top:12px;padding:0 6px;
+  }
+  .page-num{position:absolute;bottom:10px;right:14px;font-size:10px;color:var(--ink-soft);}
+  .empty-slot{
+    display:flex;align-items:center;justify-content:center;background:var(--paper-dim);
+    border:1.5px dashed #d8c9ac;border-radius:6px;color:#b6a686;font-size:12px;text-align:center;
+    height:100%;
+  }
+
+  .export-bar{display:flex;gap:10px;justify-content:center;margin-top:6px;flex-wrap:wrap;}
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    background:var(--ink);color:#fff;padding:10px 20px;border-radius:999px;font-size:13px;
+    opacity:0;transition:.25s;pointer-events:none;z-index:100;
+  }
+  .toast.show{opacity:1;}
+  .empty-state{
+    text-align:center;padding:60px 20px;color:var(--ink-soft);
+  }
+  .empty-state .btn{margin-top:14px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">ZuvkhunTuund <span>Instagram Ном</span></div>
+  <div id="topbarActions"></div>
+</div>
+
+<div class="layout">
+  <div class="pool" id="pool">
+    <h3>Зургийн сан</h3>
+    <p class="hint">Instagram-аа холбоод зургаа чирж хуудас руу тавина уу.</p>
+    <div id="poolGrid" class="pool-grid"></div>
+  </div>
+
+  <div class="workspace">
+    <div id="controls" class="controls-row" style="display:none;">
+      <div class="seg" id="layoutSeg">
+        <button data-l="grid2" class="active">Grid (олон зураг)</button>
+        <button data-l="grid1">1 зураг + бичвэр</button>
+      </div>
+      <button class="btn ghost" id="addPageBtn">+ Хуудас нэмэх</button>
+    </div>
+
+    <div id="pagesRail" class="pages-rail"></div>
+    <div id="bookArea"></div>
+
+    <div id="exportBar" class="export-bar" style="display:none;">
+      <button class="btn gold" id="exportPrint">📖 Хэвлэхэд бэлэн PDF (A5)</button>
+      <button class="btn ghost" id="exportDigital">📱 Дижитал PDF</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const state = {
+  connected: false,
+  media: [],
+  usedIds: new Set(),
+  pages: [], // {layout:'grid2'|'grid1'|'cover', photos:[urlOrNull,...], caption:''}
+  activePage: 0,
+};
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+function renderTopbar(){
+  const el = document.getElementById('topbarActions');
+  if(!state.connected){
+    el.innerHTML = `<button class="btn" id="connectBtn">Instagram холбох</button>`;
+    document.getElementById('connectBtn').onclick = () => {
+      window.location.href = '/.netlify/functions/instagram-login';
+    };
+  } else {
+    el.innerHTML = `<span style="font-size:13px;color:#8A9A7E;font-weight:600;">✓ Холбогдсон</span>`;
+  }
+}
+
+async function loadMedia(){
+  try{
+    const res = await fetch('/.netlify/functions/instagram-media');
+    if(!res.ok){ return; }
+    const data = await res.json();
+    state.media = data.media || [];
+    state.connected = true;
+    renderTopbar();
+    renderPool();
+    document.getElementById('controls').style.display = 'flex';
+    document.getElementById('exportBar').style.display = 'flex';
+    if(state.pages.length === 0) addDefaultPages();
+  }catch(e){ console.error(e); }
+}
+
+function renderPool(){
+  const grid = document.getElementById('poolGrid');
+  if(state.media.length === 0){
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;padding:20px 4px;">Зураг олдсонгүй.</div>`;
+    return;
+  }
+  grid.innerHTML = state.media.map(m => `
+    <div class="pool-item ${state.usedIds.has(m.id)?'used':''}" draggable="true" data-id="${m.id}">
+      <img src="${m.thumbnail_url || m.media_url}" />
+      ${state.usedIds.has(m.id) ? '<div class="tick">✓</div>' : ''}
+    </div>
+  `).join('');
+  grid.querySelectorAll('.pool-item').forEach(item=>{
+    item.addEventListener('dragstart', e=>{
+      e.dataTransfer.setData('text/plain', item.dataset.id);
+    });
+  });
+}
+
+function addDefaultPages(){
+  state.pages.push({layout:'cover', photos:[], caption:''});
+  state.pages.push({layout:'grid2', photos:[null,null,null,null], caption:''});
+  renderAll();
+}
+
+function addPage(){
+  const layout = document.querySelector('#layoutSeg button.active').dataset.l;
+  const photos = layout === 'grid1' ? [null] : [null,null,null,null];
+  state.pages.push({layout, photos, caption:''});
+  state.activePage = state.pages.length - 1;
+  renderAll();
+}
+
+function removePage(i){
+  const p = state.pages[i];
+  p.photos.forEach(id=>{ if(id) state.usedIds.delete(id); });
+  state.pages.splice(i,1);
+  if(state.activePage >= state.pages.length) state.activePage = state.pages.length-1;
+  renderAll();
+}
+
+function renderPagesRail(){
+  const rail = document.getElementById('pagesRail');
+  rail.innerHTML = state.pages.map((p,i)=>`
+    <div class="page-chip ${i===state.activePage?'active':''}" data-i="${i}">
+      ${p.layout==='cover'?'Хавтас':'Хуудас '+i}
+      ${p.layout!=='cover' ? `<div class="del" data-del="${i}">×</div>` : ''}
+    </div>
+  `).join('');
+  rail.querySelectorAll('.page-chip').forEach(chip=>{
+    chip.addEventListener('click', e=>{
+      if(e.target.dataset.del !== undefined && e.target.dataset.del !== ''){
+        removePage(parseInt(e.target.dataset.del)); return;
+      }
+      state.activePage = parseInt(chip.dataset.i);
+      renderAll();
+    });
+  });
+}
+
+function findMedia(id){ return state.media.find(m=>m.id===id); }
+
+function renderBook(){
+  const area = document.getElementById('bookArea');
+  const p = state.pages[state.activePage];
+  if(!p){ area.innerHTML = ''; return; }
+
+  let inner = '';
+  if(p.layout === 'cover'){
+    inner = `
+      <div class="page cover" id="pdfPage">
+        <div>
+          <div class="title">Миний дуртай мөчүүд</div>
+          <div class="gold-line"></div>
+          <div class="sub">@ chиний instagram-аас түүвэрлэв</div>
+        </div>
+      </div>`;
+  } else {
+    const slots = p.photos.map((id,idx)=>{
+      const m = id ? findMedia(id) : null;
+      return `<div class="dropslot" data-idx="${idx}" style="height:100%;">
+        ${m ? `<img src="${m.media_url}" />` : `<div class="empty-slot">Зураг чирж тавих</div>`}
+      </div>`;
+    }).join('');
+    inner = `
+      <div class="page" id="pdfPage">
+        <div class="page-photos ${p.layout==='grid1'?'grid1':'grid2'}">${slots}</div>
+        ${p.layout==='grid1' ? `<div class="page-caption" contenteditable="true" id="captionInput">${p.caption || 'Энд бичвэрээ бичнэ үү...'}</div>` : ''}
+        <div class="page-num">${state.activePage}</div>
+      </div>`;
+  }
+
+  area.innerHTML = `<div class="book-wrap"><div class="book"><div class="spine"></div>${inner}</div></div>`;
+
+  // drag & drop targets
+  area.querySelectorAll('.dropslot').forEach(slot=>{
+    slot.addEventListener('dragover', e=>e.preventDefault());
+    slot.addEventListener('drop', e=>{
+      e.preventDefault();
+      const id = e.dataTransfer.getData('text/plain');
+      const idx = parseInt(slot.dataset.idx);
+      const prev = p.photos[idx];
+      if(prev) state.usedIds.delete(prev);
+      p.photos[idx] = id;
+      state.usedIds.add(id);
+      renderAll();
+    });
+  });
+
+  const capInput = document.getElementById('captionInput');
+  if(capInput){
+    capInput.addEventListener('blur', ()=>{ p.caption = capInput.textContent.trim(); });
+  }
+}
+
+function renderAll(){
+  renderPagesRail();
+  renderBook();
+  renderPool();
+}
+
+document.getElementById('layoutSeg').addEventListener('click', e=>{
+  if(e.target.tagName !== 'BUTTON') return;
+  document.querySelectorAll('#layoutSeg button').forEach(b=>b.classList.remove('active'));
+  e.target.classList.add('active');
+});
+document.getElementById('addPageBtn').addEventListener('click', addPage);
+
+// ---- PDF export ----
+async function exportPdf(mode){
+  toast('Ном бэлдэж байна...');
+  const isPrint = mode === 'print';
+  // A5 = 148 x 210 mm
+  const pdf = new jspdf.jsPDF({ unit:'mm', format:'a5', orientation:'portrait' });
+  const prevActive = state.activePage;
+
+  for(let i=0;i<state.pages.length;i++){
+    state.activePage = i;
+    renderBook();
+    await new Promise(r=>setTimeout(r,60)); // цаг өгч зураг ачаалуулах
+    const node = document.getElementById('pdfPage');
+    const canvas = await html2canvas(node, { scale: isPrint ? 3 : 2, useCORS:true, backgroundColor:null });
+    const img = canvas.toDataURL('image/jpeg', 0.95);
+    if(i>0) pdf.addPage('a5','portrait');
+    pdf.addImage(img, 'JPEG', 0, 0, 148, 210);
+  }
+
+  state.activePage = prevActive;
+  renderBook();
+  pdf.save(isPrint ? 'zuvkhuntuund-ig-nom-hevlekh.pdf' : 'zuvkhuntuund-ig-nom-digital.pdf');
+  toast('Бэлэн боллоо!');
+}
+
+document.getElementById('exportPrint').addEventListener('click', ()=>exportPdf('print'));
+document.getElementById('exportDigital').addEventListener('click', ()=>exportPdf('digital'));
+
+// ---- init ----
+(function init(){
+  renderTopbar();
+  const params = new URLSearchParams(window.location.search);
+  if(params.get('error')) toast(params.get('error'));
+  // Cookie тавигдсан эсэхийг шалгахын оронд шууд media татаж үзнэ;
+  // 401 ирвэл холбогдоогүй гэсэн үг тул анхны байдлаараа үлдэнэ.
+  loadMedia();
+})();
+</script>
+</body>
+</html>
