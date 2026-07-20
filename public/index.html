@@ -337,6 +337,12 @@ function renderPagesRail(){
 
 function findMedia(id){ return state.media.find(m=>m.id===id); }
 
+function shortenCaption(text){
+  if(!text) return '';
+  const clean = text.trim();
+  return clean.length > 220 ? clean.slice(0, 220).trim() + '…' : clean;
+}
+
 function renderBook(){
   const area = document.getElementById('bookArea');
   const p = state.pages[state.activePage];
@@ -369,6 +375,22 @@ function renderBook(){
 
   area.innerHTML = `<div class="book-wrap"><div class="book"><div class="spine"></div>${inner}</div></div>`;
 
+  // Instagram-ийн анхны бичвэрийг дахин татаж ашиглах товч (зөвхөн 1 зурагтай
+  // layout-д, PDF-д ороогүй #pdfPage-ийн гадна тул export хийхэд харагдахгүй)
+  if(p.layout === 'grid1' && p.photos[0]){
+    const m = findMedia(p.photos[0]);
+    if(m && m.caption){
+      const igBtn = document.createElement('div');
+      igBtn.style.cssText = 'text-align:center;margin-top:10px;';
+      igBtn.innerHTML = `<button class="btn ghost" id="pullCaptionBtn" style="font-size:12px;padding:7px 14px;">📋 Instagram-ийн бичвэрийг ашиглах</button>`;
+      area.appendChild(igBtn);
+      document.getElementById('pullCaptionBtn').addEventListener('click', ()=>{
+        p.caption = shortenCaption(m.caption);
+        renderBook();
+      });
+    }
+  }
+
   // Дарж сонгох / байрлуулах / арилгах
   area.querySelectorAll('.dropslot').forEach(slot=>{
     slot.addEventListener('click', ()=>{
@@ -379,6 +401,12 @@ function renderBook(){
         if(prevId) state.usedIds.delete(prevId);
         p.photos[idx] = state.selectedPhotoId;
         state.usedIds.add(state.selectedPhotoId);
+        // 1 зураг + бичвэр layout дээр, бичвэр хараахан бичигдээгүй бол
+        // Instagram-ийн анхны caption-ыг автоматаар татаж авна
+        if(p.layout === 'grid1' && !p.caption){
+          const m = findMedia(state.selectedPhotoId);
+          if(m && m.caption) p.caption = shortenCaption(m.caption);
+        }
         state.selectedPhotoId = null;
         renderAll();
       } else if(prevId){
