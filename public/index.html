@@ -137,6 +137,27 @@
     text-align:center;padding:60px 20px;color:var(--ink-soft);
   }
   .empty-state .btn{margin-top:14px;}
+
+  .info-banner{
+    display:flex;gap:12px;align-items:flex-start;background:#F3ECDF;border:1px solid #e6d7b8;
+    border-radius:10px;padding:14px 16px;margin:16px 28px 0;font-size:13px;color:var(--ink);
+  }
+  .info-banner .icon{font-size:18px;line-height:1;}
+  .info-banner a{color:var(--rose-deep);font-weight:600;cursor:pointer;text-decoration:underline;}
+
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(43,36,32,.45);display:none;align-items:center;justify-content:center;
+    z-index:200;padding:20px;
+  }
+  .modal-overlay.show{display:flex;}
+  .modal{
+    background:var(--paper);border-radius:14px;max-width:420px;width:100%;padding:26px;
+    box-shadow:0 20px 60px rgba(0,0,0,.25);
+  }
+  .modal h3{font-family:'Playfair Display',serif;color:var(--rose-deep);margin:0 0 14px;font-size:19px;}
+  .modal ol{margin:0 0 18px;padding-left:20px;font-size:13.5px;line-height:1.7;color:var(--ink);}
+  .modal ol li{margin-bottom:6px;}
+  .modal .modal-close{display:flex;justify-content:flex-end;}
 </style>
 </head>
 <body>
@@ -144,6 +165,30 @@
 <div class="topbar">
   <div class="brand">ZuvkhunTuund <span>Instagram Ном</span></div>
   <div id="topbarActions"></div>
+</div>
+
+<div class="info-banner" id="creatorNotice">
+  <div class="icon">💡</div>
+  <div>
+    Instagram холбохын тулд акаунтаа <strong>Creator</strong> болгох хэрэгтэй
+    (30 секунд, үнэгүй, дараа нь хүссэн үедээ Personal руугаа буцааж болно).
+    <a id="howToLink">Хэрхэн хийхийг харах →</a>
+  </div>
+</div>
+
+<div class="modal-overlay" id="howToModal">
+  <div class="modal">
+    <h3>Instagram-аа Creator болгох</h3>
+    <ol>
+      <li>Instagram апп → профайл хуудсандаа орно</li>
+      <li>Дээд буланд байгаа ☰ цэс → <strong>Тохиргоо болон нууцлал</strong></li>
+      <li><strong>Акаунт төрөл</strong> (Account type and tools) хэсэгт орно</li>
+      <li><strong>Professional акаунт руу шилжих</strong> дараад <strong>Creator</strong>-г сонгоно</li>
+      <li>Ангилал (жишээ нь "Artist" эсвэл "Public figure") сонгоод баталгаажуулна</li>
+      <li>Дараа нь энэ хуудас руу буцаж ирээд <strong>Instagram холбох</strong> товчийг дарна</li>
+    </ol>
+    <div class="modal-close"><button class="btn ghost" id="closeModal">Ойлголоо</button></div>
+  </div>
 </div>
 
 <div class="layout">
@@ -372,6 +417,16 @@ async function exportPdf(mode){
 document.getElementById('exportPrint').addEventListener('click', ()=>exportPdf('print'));
 document.getElementById('exportDigital').addEventListener('click', ()=>exportPdf('digital'));
 
+document.getElementById('howToLink').addEventListener('click', ()=>{
+  document.getElementById('howToModal').classList.add('show');
+});
+document.getElementById('closeModal').addEventListener('click', ()=>{
+  document.getElementById('howToModal').classList.remove('show');
+});
+document.getElementById('howToModal').addEventListener('click', e=>{
+  if(e.target.id === 'howToModal') e.target.classList.remove('show');
+});
+
 // ---- init ----
 (function init(){
   renderTopbar();
@@ -379,7 +434,11 @@ document.getElementById('exportDigital').addEventListener('click', ()=>exportPdf
   if(params.get('error')) toast(params.get('error'));
   // Cookie тавигдсан эсэхийг шалгахын оронд шууд media татаж үзнэ;
   // 401 ирвэл холбогдоогүй гэсэн үг тул анхны байдлаараа үлдэнэ.
-  loadMedia();
+  loadMedia().then(()=>{
+    if(state.connected){
+      document.getElementById('creatorNotice').style.display = 'none';
+    }
+  });
 })();
 </script>
 </body>
