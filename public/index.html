@@ -443,7 +443,11 @@ function autoBuildBook(){
 
   state.usedIds = new Set();
   state.pages = [{layout:'cover', photos:[], caption:''}];
-  state.media.forEach(m=>{
+  // Instagram API зургуудыг шинэ→хуучин дарааллаар буцаадаг тул,
+  // хамгийн эхний (хамгийн хуучин) зураг номны эхний хуудас болгохын тулд
+  // огноогоор өсөх дараалалд эрэмбэлнэ
+  const orderedMedia = [...state.media].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  orderedMedia.forEach(m=>{
     state.pages.push({
       layout:'grid1',
       photos:[m.id],
