@@ -23,51 +23,51 @@ exports.handler = async (event) => {
   });
 
   const authorizeUrl = `https://www.instagram.com/oauth/authorize?${params.toString()}`;
-  // iOS дээр Instagram апп суулгасан байвал шууд redirect хийхэд Universal Link
-  // барьж аваад зөвшөөрлийн дэлгэц харуулахгүйгээр апп руу шидчихдэг тул,
-  // x-safari-https:// scheme ашиглан Safari дээр л нээгдэхийг албадана.
-  const safariUrl = authorizeUrl.replace(/^https:\/\//, "x-safari-https://");
+
+  // Серверийн талд iOS Safari эсэхийг шалгана (Chrome/Firefox for iOS-г хасна,
+  // учир нь тэдгээр нь UA дотроо CriOS/FxiOS агуулдаг).
+  const ua = (event.headers["user-agent"] || event.headers["User-Agent"] || "");
+  const isIOS = /iP(hone|od|ad)/.test(ua);
+  const isIOSSafari = isIOS && /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+
+  // iOS Safari дээр Instagram апп Universal Link-ээр барьж аваад
+  // зөвшөөрлийн дэлгэц харуулахгүй апп руу шидчихдэг тул x-safari-https
+  // scheme ашиглан Safari дотроо албадан нээнэ. Энэ trick нь ЗӨВХӨН
+  // хэрэглэгчийн ЖИНХЭНЭ товшилтоор ажилладаг тул автомат JS redirect хийхгүй.
+  const linkUrl = isIOSSafari ? authorizeUrl.replace(/^https:\/\//, "x-safari-https://") : authorizeUrl;
 
   const html = `<!DOCTYPE html>
 <html lang="mn">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Instagram руу шилжиж байна...</title>
+<title>Instagram холбох</title>
 <style>
   body{
     font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;
     background:#FBF7F0;color:#2B2420;display:flex;flex-direction:column;
     align-items:center;justify-content:center;min-height:100vh;margin:0;padding:24px;text-align:center;
   }
-  .spinner{
-    width:32px;height:32px;border:3px solid #e6dcc9;border-top-color:#7E2F42;
-    border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:18px;
+  h1{font-size:19px;margin-bottom:10px;}
+  p{color:#6b5f56;font-size:14px;max-width:300px;margin-bottom:22px;line-height:1.5;}
+  a.go{
+    display:inline-block;background:#7E2F42;color:#fff;font-weight:600;font-size:15px;
+    padding:14px 30px;border-radius:999px;text-decoration:none;
   }
-  @keyframes spin{to{transform:rotate(360deg);}}
-  p{color:#6b5f56;font-size:14px;max-width:280px;}
-  a.manual{
-    margin-top:16px;color:#7E2F42;font-weight:600;text-decoration:underline;font-size:14px;
-  }
+  .tip{margin-top:22px;font-size:12.5px;color:#9c8f83;max-width:280px;line-height:1.6;}
+  .tip b{color:#6b5f56;}
 </style>
 </head>
 <body>
-  <div class="spinner"></div>
-  <p>Instagram-ийн зөвшөөрлийн хуудас руу шилжиж байна...</p>
-  <a class="manual" id="manualLink" href="${authorizeUrl}">Автоматаар шилжихгүй бол энд дарна уу</a>
+  <h1>Instagram холбох</h1>
+  <p>Доорх товчийг дарж Instagram-ийн зөвшөөрлийн хуудас руу шилжинэ үү.</p>
+  <a class="go" href="${linkUrl}">Instagram руу үргэлжлүүлэх</a>
 
-  <script>
-    (function () {
-      var isIOS = /iP(hone|od|ad)/.test(navigator.userAgent);
-      var isSafari = isIOS && /Safari/.test(navigator.userAgent) && !/CriOS|FxiOS|EdgiOS/.test(navigator.userAgent);
-      var target = isSafari ? "${safariUrl}" : "${authorizeUrl}";
-      document.getElementById('manualLink').href = target;
-      // Хэрэглэгчийн "trusted" tap-тай төстэй болгохын тулд жаахан хойшлуулаад шилжинэ
-      setTimeout(function () {
-        window.location.href = target;
-      }, 300);
-    })();
-  </script>
+  <p class="tip">
+    Хэрэв товчийг дарахад зөвхөн Instagram апп нээгдээд юу ч болохгүй бол:
+    линк дээр <b>хуруугаараа удаан дараад</b> ("long press") гарч ирэх цэснээс
+    <b>"Open in Safari"</b> (эсвэл "Ил задлах") гэдгийг сонгоно уу.
+  </p>
 </body>
 </html>`;
 
