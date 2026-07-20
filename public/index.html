@@ -213,6 +213,7 @@
         <button data-l="grid1">1 зураг + бичвэр</button>
       </div>
       <button class="btn ghost" id="addPageBtn">+ Хуудас нэмэх</button>
+      <button class="btn gold" id="autoBuildBtn">✨ Бүх зургаар автоматаар үүсгэх</button>
     </div>
 
     <div id="pagesRail" class="pages-rail"></div>
@@ -432,12 +433,37 @@ function renderAll(){
   renderPool();
 }
 
+function autoBuildBook(){
+  if(state.media.length === 0){
+    toast('Эхлээд Instagram зургаа ачаалуулна уу');
+    return;
+  }
+  const confirmMsg = 'Одоо байгаа хуудсууд арилж, Instagram-ийн бүх зурагт тус бүр "1 зураг + бичвэр" хуудас автоматаар үүснэ. Үргэлжлүүлэх үү?';
+  if(!window.confirm(confirmMsg)) return;
+
+  state.usedIds = new Set();
+  state.pages = [{layout:'cover', photos:[], caption:''}];
+  state.media.forEach(m=>{
+    state.pages.push({
+      layout:'grid1',
+      photos:[m.id],
+      caption: shortenCaption(m.caption || ''),
+    });
+    state.usedIds.add(m.id);
+  });
+  state.activePage = 1;
+  state.selectedPhotoId = null;
+  renderAll();
+  toast(`${state.media.length} зурагтай ном үүслээ!`);
+}
+
 document.getElementById('layoutSeg').addEventListener('click', e=>{
   if(e.target.tagName !== 'BUTTON') return;
   document.querySelectorAll('#layoutSeg button').forEach(b=>b.classList.remove('active'));
   e.target.classList.add('active');
 });
 document.getElementById('addPageBtn').addEventListener('click', addPage);
+document.getElementById('autoBuildBtn').addEventListener('click', autoBuildBook);
 
 // ---- PDF export ----
 async function exportPdf(mode){
