@@ -124,6 +124,12 @@
   .page-photos.grid1{display:flex;flex:1;}
   .page-photos img{width:100%;height:100%;object-fit:cover;border-radius:4px;}
   .cover-img{width:100%;height:100%;border-radius:4px;background-size:cover;background-position:center;background-repeat:no-repeat;background-color:#eee0cc;}
+  .cover-img.broken{
+    background-image:none !important;
+    display:flex;align-items:center;justify-content:center;
+    background:repeating-linear-gradient(45deg,#eee0cc,#eee0cc 8px,#f5ead9 8px,#f5ead9 16px);
+  }
+  .cover-img.broken::after{content:'Зураг ачаалагдсангүй — 🔄 дахин ачаалж үзнэ үү';font-size:11px;color:#9c8262;text-align:center;padding:10px;}
   .page-caption{
     font-family:'Cormorant Garamond',serif;font-style:italic;font-size:14px;color:var(--ink-soft);
     text-align:center;margin-top:12px;padding:0 6px;
@@ -366,8 +372,10 @@ function renderBook(){
   } else {
     const slots = p.photos.map((id,idx)=>{
       const m = id ? findMedia(id) : null;
+      const primary = m ? (m.media_url || m.thumbnail_url || '') : '';
+      const fallback = m ? (m.thumbnail_url || '') : '';
       return `<div class="dropslot" data-idx="${idx}" style="height:100%;">
-        ${m ? `<div class="cover-img" style="background-image:url('${m.media_url}')"></div>` : `<div class="empty-slot">Зураг сонгоод энд дар</div>`}
+        ${m ? `<div class="cover-img" data-primary="${primary}" data-fallback="${fallback}" style="background-image:url('${primary}')"></div>` : `<div class="empty-slot">Зураг сонгоод энд дар</div>`}
       </div>`;
     }).join('');
     inner = `
@@ -379,6 +387,27 @@ function renderBook(){
   }
 
   area.innerHTML = `<div class="book-wrap"><div class="book"><div class="spine"></div>${inner}</div></div>`;
+
+  // background-image нь <img>-ийн адил onerror дэмждэггүй тул JS-ээр урьдчилан
+  // ачааллаж шалгаад, эвдэрсэн бол thumbnail_url руу сольж, эсвэл тодорхой
+  // харагдах "эвдэрсэн" төлөвт оруулна (blank цагаан хэзээ ч гарахгүй байх)
+  area.querySelectorAll('.cover-img').forEach(el=>{
+    const primary = el.dataset.primary;
+    const fallback = el.dataset.fallback;
+    if(!primary) { el.classList.add('broken'); return; }
+    const test = new Image();
+    test.onerror = ()=>{
+      if(fallback && fallback !== primary){
+        el.style.backgroundImage = `url('${fallback}')`;
+        const test2 = new Image();
+        test2.onerror = ()=> el.classList.add('broken');
+        test2.src = fallback;
+      } else {
+        el.classList.add('broken');
+      }
+    };
+    test.src = primary;
+  });
 
   // Instagram-ийн анхны бичвэрийг дахин татаж ашиглах товч (зөвхөн 1 зурагтай
   // layout-д, PDF-д ороогүй #pdfPage-ийн гадна тул export хийхэд харагдахгүй)
@@ -478,7 +507,7 @@ async function exportPdf(mode){
   const isPrint = mode === 'print';
 
   if(state.pages.length > 40){
-    const ok = window.confirm(`Энэ ном ${state.pages.length} хуудастай — их хэмжээний PDF үүсгэхэд удаан хугацаа зарцуулагдаж, зарим утсан дээр (ялангуяа iPhone) алдаа гарч болзошгүй. Үргэлжлүүлэх үү? (Багасгах бол Cancel дараад илүү цөөн хуудсаар туршина уу)`);
+    const ok = window.confirm(`Энэ ном ${state.pages.length} хуудастай — их хэмжээний PDF үүсгэхэд удаан хугацаа зарцуулагдана. Утсан дээр (ялангуяа iPhone дээр) санах ой хүрэлцэхгүй, tab чимээгүйхэн хаагдах эрсдэлтэй. Боломжтой бол компьютер/laptop дээрх browser-аар хийхийг зөвлөж байна. Утсан дээрээ л хийх бол эхлээд цөөн хуудсаар (10-20) туршиж, дараа нь бүтнээр нь оролдоорой. Одоо үргэлжлүүлэх үү?`);
     if(!ok) return;
   }
 
@@ -487,8 +516,20 @@ async function exportPdf(mode){
   // хэрэглэгчийн итгэмжлэгдсэн үйлдлийн цонхонд байгаа) шинэ tab-ыг
   // урьдчилан нээж, бэлэн болмогц зөвхөн location-ыг нь шинэчилнэ.
   const preOpenedTab = window.open('', '_blank');
+  const setTabProgress = (text) => {
+    if(preOpenedTab && !preOpenedTab.closed){
+      try{
+        preOpenedTab.document.body.innerHTML = `<div style="font-family:-apple-system,sans-serif;padding:28px;color:#555;text-align:center;">
+          <div style="width:36px;height:36px;border:3px solid #eee;border-top-color:#7E2F42;border-radius:50%;margin:0 auto 16px;animation:spin .8s linear infinite;"></div>
+          <p>${text}</p>
+          <p style="font-size:12px;color:#999;margin-top:10px;">Энэ tab-аа бүү хаа</p>
+        </div>
+        <style>@keyframes spin{to{transform:rotate(360deg);}}</style>`;
+      } catch(e){}
+    }
+  };
   if(preOpenedTab){
-    preOpenedTab.document.write('<p style="font-family:sans-serif;padding:24px;color:#555;">Ном бэлдэж байна... энэ хэдэн секунд, олон хуудастай бол хэдэн минут үргэлжилж болно. Хаалгүй хүлээнэ үү.</p>');
+    setTabProgress('Ном бэлдэж байна... эхэлж байна');
   }
 
   const prevActive = state.activePage;
@@ -498,7 +539,9 @@ async function exportPdf(mode){
     const pdf = new jspdf.jsPDF({ unit:'mm', format:'a5', orientation:'portrait' });
 
     for(let i=0;i<state.pages.length;i++){
-      toast(`Бэлдэж байна... ${i+1}/${state.pages.length}`);
+      const progressText = `Бэлдэж байна... ${i+1}/${state.pages.length} хуудас`;
+      toast(progressText);
+      setTabProgress(progressText);
       state.activePage = i;
       renderBook();
       await new Promise(r=>setTimeout(r,60)); // цаг өгч зураг ачаалуулах
@@ -509,6 +552,7 @@ async function exportPdf(mode){
       pdf.addImage(img, 'JPEG', 0, 0, 148, 210);
     }
 
+    setTabProgress('Файлыг эмхэтгэж байна...');
     state.activePage = prevActive;
     renderBook();
 
@@ -524,7 +568,7 @@ async function exportPdf(mode){
     toast('Бэлэн боллоо!');
   } catch(err){
     console.error(err);
-    if(preOpenedTab && !preOpenedTab.closed) preOpenedTab.close();
+    setTabProgress('Алдаа гарлаа. Энэ tab-аа хаагаад дахин оролдоно уу.');
     toast('Алдаа гарлаа, дахин оролдоно уу');
     state.activePage = prevActive;
     renderBook();
