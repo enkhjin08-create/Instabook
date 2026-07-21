@@ -177,7 +177,7 @@
 </head>
 <body>
 
-<div style="background:#7E2F42;color:#fff;text-align:center;font-size:11px;padding:4px;">build: v7-onpage-error-log</div>
+<div style="background:#7E2F42;color:#fff;text-align:center;font-size:11px;padding:4px;">build: v8-page-data-dump</div>
 <div class="topbar">
   <div class="brand">ZuvkhunTuund <span>Instagram Ном</span></div>
   <div id="topbarActions"></div>
@@ -478,6 +478,25 @@ function renderBook(){
   const capInput = document.getElementById('captionInput');
   if(capInput){
     capInput.addEventListener('blur', ()=>{ p.caption = capInput.textContent.trim(); });
+  }
+
+  // Оношилгооны мэдээлэл — тухайн хуудасны бодит өгөгдлийг харуулна
+  if(p.layout !== 'cover'){
+    const dbg = document.createElement('pre');
+    dbg.style.cssText = 'font-size:10px;background:#2b2420;color:#9fd88a;padding:10px;margin:10px 20px;border-radius:6px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;';
+    const lines = [`layout: ${p.layout}`, `photos: ${JSON.stringify(p.photos)}`];
+    p.photos.forEach((id,i)=>{
+      const m = id ? findMedia(id) : null;
+      lines.push(`[${i}] id=${id}`);
+      lines.push(`  found in state.media: ${!!m}`);
+      if(m){
+        lines.push(`  thumbnail_url: ${m.thumbnail_url || '(байхгүй)'}`);
+        lines.push(`  media_url: ${m.media_url || '(байхгүй)'}`);
+      }
+    });
+    lines.push(`state.media.length: ${state.media.length}`);
+    dbg.textContent = lines.join('\n');
+    area.appendChild(dbg);
   }
 
   return Promise.all(imgPromises);
