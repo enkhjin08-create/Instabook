@@ -50,7 +50,13 @@
   .btn:disabled{opacity:.4;cursor:not-allowed;}
 
   .layout{display:grid;grid-template-columns:300px 1fr;min-height:calc(100vh - 66px);}
-  @media(max-width:900px){.layout{grid-template-columns:1fr;}}
+  .layout .pool{order:1;}
+  .layout .workspace{order:2;}
+  @media(max-width:900px){
+    .layout{grid-template-columns:1fr;}
+    .layout .pool{order:2;}
+    .layout .workspace{order:1;}
+  }
 
   .pool{
     border-right:1px solid #e6dcc9;padding:20px;background:var(--paper);
@@ -61,6 +67,16 @@
   }
   .pool p.hint{font-size:12px;color:var(--ink-soft);margin:0 0 14px;}
   .pool-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .pool-group{margin-bottom:10px;border:1px solid #e6dcc9;border-radius:10px;overflow:hidden;}
+  .pool-group-header{
+    display:flex;align-items:center;justify-content:space-between;padding:10px 12px;
+    background:var(--paper-dim);cursor:pointer;font-size:13px;font-weight:600;color:var(--rose-deep);
+  }
+  .pool-group-header .count{font-weight:500;color:var(--ink-soft);font-size:11.5px;}
+  .pool-group-header .chevron{transition:transform .15s;font-size:11px;color:var(--ink-soft);}
+  .pool-group.open .chevron{transform:rotate(90deg);}
+  .pool-group-body{display:none;padding:10px;}
+  .pool-group.open .pool-group-body{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
   .pool-item{
     position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;cursor:pointer;
     border:2px solid transparent;transition:.15s;
@@ -207,14 +223,6 @@
 </div>
 
 <div class="layout">
-  <div class="pool" id="pool">
-    <h3>Зургийн сан</h3>
-    <p class="hint">Зургаа дараад сонгоод, дараа нь хуудасны нүдэн дээр дарж тавина уу.</p>
-    <button class="btn ghost" id="refreshMediaBtn" style="font-size:11.5px;padding:6px 12px;margin-bottom:12px;">🔄 Зураг дахин ачаалах</button>
-    <div id="poolGrid" class="pool-grid"></div>
-    <div class="select-banner" id="selectBanner">Сонгосон зураг ✓ — одоо хуудасны нүдэн дээр дарна уу</div>
-  </div>
-
   <div class="workspace">
     <div id="controls" class="controls-row" style="display:none;">
       <div class="seg" id="layoutSeg">
@@ -241,6 +249,14 @@
       <button class="btn ghost" id="exportDigital">📱 Дижитал PDF</button>
     </div>
   </div>
+
+  <div class="pool" id="pool">
+    <h3>Зургийн сан</h3>
+    <p class="hint">Зургаа дараад сонгоод, дараа нь хуудасны нүдэн дээр дарж тавина уу.</p>
+    <button class="btn ghost" id="refreshMediaBtn" style="font-size:11.5px;padding:6px 12px;margin-bottom:12px;">🔄 Зураг дахин ачаалах</button>
+    <div id="poolGroups"></div>
+    <div class="select-banner" id="selectBanner">Сонгосон зураг ✓ — одоо хуудасны нүдэн дээр дарна уу</div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -253,6 +269,7 @@ const state = {
   pages: [], // {layout:'grid2'|'grid1'|'cover', photos:[urlOrNull,...], caption:''}
   activePage: 0,
   selectedPhotoId: null, // тухайн үед "сонгогдсон" зураг — дараагийн товшилтоор хуудсанд байрлана
+  openPoolGroups: new Set(), // сар бүрийн групп дэлгэгдсэн эсэх
 };
 
 function toast(msg){
@@ -301,22 +318,67 @@ async function loadMedia(){
   }
 }
 
+const MN_MONTHS = ['1-р сар','2-р сар','3-р сар','4-р сар','5-р сар','6-р сар','7-р сар','8-р сар','9-р сар','10-р сар','11-р сар','12-р сар'];
+
 function renderPool(){
-  const grid = document.getElementById('poolGrid');
+  const container = document.getElementById('poolGroups');
   const banner = document.getElementById('selectBanner');
   banner.classList.toggle('show', !!state.selectedPhotoId);
   if(state.media.length === 0){
-    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;padding:20px 4px;">Зураг олдсонгүй.</div>`;
+    container.innerHTML = `<div class="empty-state" style="padding:20px 4px;">Зураг олдсонгүй.</div>`;
     return;
   }
-  grid.innerHTML = state.media.map(m => `
-    <div class="pool-item ${state.usedIds.has(m.id)?'used':''} ${state.selectedPhotoId===m.id?'selected':''}" data-id="${m.id}">
-      <img src="${m.thumbnail_url || m.media_url}" loading="lazy" decoding="async"
-           onerror="this.onerror=null; if(this.src!=='${m.media_url}'){this.src='${m.media_url}';} else {this.parentElement.classList.add('broken');}" />
-      ${state.usedIds.has(m.id) ? '<div class="tick">✓</div>' : ''}
-    </div>
-  `).join('');
-  grid.querySelectorAll('.pool-item').forEach(item=>{
+
+  // Сар/жилээр багцлах (Instagram-аас ирэх дараалал шинэ→хуучин тул,
+  // энэ мөр дарааллаар групп үүсгэхэд автоматаар шинэ сар нь эхэнд ирнэ)
+  const groups = new Map(); // key -> {label, items:[]}
+  state.media.forEach(m=>{
+    const d = new Date(m.timestamp);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    if(!groups.has(key)){
+      groups.set(key, { label: `${d.getFullYear()} оны ${MN_MONTHS[d.getMonth()]}`, items: [] });
+    }
+    groups.get(key).items.push(m);
+  });
+
+  // Анх удаа ачаалахад хамгийн сүүлийн (эхний) группыг нээлттэй болгоно
+  if(state.openPoolGroups.size === 0 && groups.size > 0){
+    state.openPoolGroups.add(groups.keys().next().value);
+  }
+
+  container.innerHTML = [...groups.entries()].map(([key, g])=>{
+    const isOpen = state.openPoolGroups.has(key);
+    const itemsHtml = g.items.map(m => `
+      <div class="pool-item ${state.usedIds.has(m.id)?'used':''} ${state.selectedPhotoId===m.id?'selected':''}" data-id="${m.id}">
+        <img src="${m.thumbnail_url || m.media_url}" loading="lazy" decoding="async"
+             onerror="this.onerror=null; if(this.src!=='${m.media_url}'){this.src='${m.media_url}';} else {this.parentElement.classList.add('broken');}" />
+        ${state.usedIds.has(m.id) ? '<div class="tick">✓</div>' : ''}
+      </div>
+    `).join('');
+    return `
+      <div class="pool-group ${isOpen?'open':''}" data-key="${key}">
+        <div class="pool-group-header">
+          <span>${g.label}</span>
+          <span><span class="count">${g.items.length} зураг</span> <span class="chevron">▶</span></span>
+        </div>
+        <div class="pool-group-body">${itemsHtml}</div>
+      </div>`;
+  }).join('');
+
+  container.querySelectorAll('.pool-group-header').forEach(header=>{
+    header.addEventListener('click', ()=>{
+      const groupEl = header.closest('.pool-group');
+      const key = groupEl.dataset.key;
+      if(state.openPoolGroups.has(key)){
+        state.openPoolGroups.delete(key);
+      } else {
+        state.openPoolGroups.add(key);
+      }
+      groupEl.classList.toggle('open');
+    });
+  });
+
+  container.querySelectorAll('.pool-item').forEach(item=>{
     item.addEventListener('click', ()=>{
       const id = item.dataset.id;
       // Сонгосон зургаа дахин дарвал сонголтыг цуцална
