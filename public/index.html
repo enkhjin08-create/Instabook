@@ -177,7 +177,7 @@
 </head>
 <body>
 
-<div style="background:#7E2F42;color:#fff;text-align:center;font-size:11px;padding:4px;">build: v6-image-timeout-fix</div>
+<div style="background:#7E2F42;color:#fff;text-align:center;font-size:11px;padding:4px;">build: v7-onpage-error-log</div>
 <div class="topbar">
   <div class="brand">ZuvkhunTuund <span>Instagram Ном</span></div>
   <div id="topbarActions"></div>
@@ -627,6 +627,28 @@ document.getElementById('refreshMediaBtn').addEventListener('click', async ()=>{
 });
 
 // ---- init ----
+// ---- дэлгэц дээрх алдааны мэдэгдэл (iPad дээр console байхгүй тул) ----
+function showDebugError(msg){
+  let box = document.getElementById('debugErrorBox');
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'debugErrorBox';
+    box.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#c0392b;color:#fff;font-size:11px;padding:10px;z-index:999;max-height:35vh;overflow-y:auto;white-space:pre-wrap;font-family:monospace;';
+    document.body.appendChild(box);
+  }
+  const line = document.createElement('div');
+  line.style.cssText = 'border-top:1px solid rgba(255,255,255,.3);padding-top:6px;margin-top:6px;';
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  box.appendChild(line);
+}
+window.addEventListener('error', (e)=>{
+  showDebugError(`JS Error: ${e.message} (${e.filename ? e.filename.split('/').pop() : '?'}:${e.lineno})`);
+});
+window.addEventListener('unhandledrejection', (e)=>{
+  const reason = e.reason && e.reason.message ? e.reason.message : String(e.reason);
+  showDebugError(`Promise rejection: ${reason}`);
+});
+
 (function init(){
   renderTopbar();
   const params = new URLSearchParams(window.location.search);
