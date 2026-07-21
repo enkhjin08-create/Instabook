@@ -123,7 +123,7 @@
   .page-photos.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;flex:1;}
   .page-photos.grid1{display:flex;flex:1;}
   .page-photos img{width:100%;height:100%;object-fit:cover;border-radius:4px;}
-  .cover-img{width:100%;height:100%;border-radius:4px;background-size:cover;background-position:center;background-repeat:no-repeat;background-color:#eee0cc;}
+  .cover-img{width:100%;height:100%;border-radius:4px;object-fit:cover;display:block;background-color:#eee0cc;}
   .cover-img.broken{
     background-image:none !important;
     display:flex;align-items:center;justify-content:center;
@@ -177,7 +177,7 @@
 </head>
 <body>
 
-<div style="background:#7E2F42;color:#fff;text-align:center;font-size:11px;padding:4px;">build: v10-visible-fetch-errors</div>
+<div style="background:#7E2F42;color:#fff;text-align:center;font-size:11px;padding:4px;">build: v11-img-tag-like-pool</div>
 <div class="topbar">
   <div class="brand">ZuvkhunTuund <span>Instagram Ном</span></div>
   <div id="topbarActions"></div>
@@ -386,7 +386,7 @@ function renderBook(){
     const slots = p.photos.map((id,idx)=>{
       const m = id ? findMedia(id) : null;
       return `<div class="dropslot" data-idx="${idx}" style="height:100%;">
-        ${m ? `<div class="cover-img"></div>` : `<div class="empty-slot">Зураг сонгоод энд дар</div>`}
+        ${m ? `<img class="cover-img" alt="" />` : `<div class="empty-slot">Зураг сонгоод энд дар</div>`}
       </div>`;
     }).join('');
     inner = `
@@ -401,7 +401,8 @@ function renderBook(){
 
   // Зургийн URL-ыг HTML attribute болгож шигтгэхийн оронд (тэмдэгтийн
   // асуудлаас болж чимээгүй эвдэрч болдог байсан), state-ээс шууд уншиж
-  // JS property-аар (innerHTML-гүйгээр) аюулгүй тавина.
+  // JS property-аар (innerHTML-гүйгээр) аюулгүй тавина. Зургийн санд адилхан
+  // <img> tag ашигладаг (тэнд батлагдсан ажилладаг).
   const imgPromises = [];
   if(p.layout !== 'cover'){
     area.querySelectorAll('.dropslot').forEach(slot=>{
@@ -413,24 +414,23 @@ function renderBook(){
       const primary = m ? (m.thumbnail_url || m.media_url || '') : '';
       const markBroken = (reason)=>{
         if(!document.contains(coverEl)) return; // хуудас аль хэдийн солигдсон бол хийхгүй
-        coverEl.classList.add('broken');
-        coverEl.textContent = `⚠️ Зураг ачаалагдсангүй\nID: ${id}\n${reason}`;
+        const box = document.createElement('div');
+        box.className = 'cover-img broken';
+        box.textContent = `⚠️ Зураг ачаалагдсангүй\nID: ${id}\n${reason}`;
+        if(coverEl.parentNode) coverEl.parentNode.replaceChild(box, coverEl);
       };
       if(!m){ markBroken('Энэ зураг Instagram-ийн жагсаалтад олдсонгүй (устсан эсвэл шинэчлэлт хэрэгтэй)'); return; }
       if(!primary){ markBroken('Instagram-аас ямар ч зургийн холбоос ирээгүй'); return; }
 
-      // Шууд, хойшлуулалгүйгээр тавина (optimistic) — ихэнх зураг шууд харагдана
-      coverEl.style.backgroundImage = `url("${primary}")`;
+      // Зургийн санд ашигласантай яг адил — шууд src тавина
+      coverEl.src = primary;
 
-      // Арын дэвсгэрт баталгаажуулж, үнэхээр эвдэрсэн бол л дараа нь тэмдэглэнэ
       const p1 = new Promise(resolve=>{
         let settled = false;
         const done = (fn)=>{ if(settled) return; settled = true; clearTimeout(timer); fn(); resolve(); };
-        const timer = setTimeout(()=> done(()=>{}), 8000); // хугацаа хэтэрвэл зүгээр орхино, broken гэж тэмдэглэхгүй
-        const test = new Image();
-        test.onload = ()=> done(()=>{});
-        test.onerror = ()=> done(()=> markBroken('Зургийн холбоос ачаалагдсангүй (Instagram талын алдаа байж болно)'));
-        test.src = primary;
+        const timer = setTimeout(()=> done(()=>{}), 8000);
+        coverEl.onload = ()=> done(()=>{});
+        coverEl.onerror = ()=> done(()=> markBroken('Зургийн холбоос ачаалагдсангүй (Instagram талын алдаа байж болно)'));
       });
       imgPromises.push(p1);
     });
