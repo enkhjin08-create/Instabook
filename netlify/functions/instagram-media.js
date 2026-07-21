@@ -25,6 +25,25 @@ exports.handler = async (event) => {
       url = data.paging && data.paging.next ? data.paging.next : null;
     }
 
+    // Зарим CAROUSEL_ALBUM (олон зурагтай) пост дээр Instagram талын алдаанаас
+    // болж media_url огт ирдэггүй тохиолдол байдаг тул, дутуу байгаа зурагны
+    // эхний дэд-зургийг тусад нь татаж нөхнө.
+    const missing = all.filter((m) => !m.media_url && !m.thumbnail_url);
+    for (const m of missing) {
+      try {
+        const childUrl = `https://graph.instagram.com/${m.id}/children?fields=media_url,media_type&access_token=${token}`;
+        const childRes = await fetch(childUrl);
+        const childData = await childRes.json();
+        const firstChild = childData.data && childData.data[0];
+        if (firstChild && firstChild.media_url) {
+          m.media_url = firstChild.media_url;
+        }
+      } catch (e) {
+        // Тухайн зургийг алгасаад үргэлжлүүлнэ, бүх жагсаалтыг зогсоохгүй
+        console.error("child fetch failed for", m.id, e);
+      }
+    }
+
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
