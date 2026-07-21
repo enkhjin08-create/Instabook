@@ -177,7 +177,7 @@
 </head>
 <body>
 
-<div style="background:#7E2F42;color:#fff;text-align:center;font-size:11px;padding:4px;">build: v9-sync-optimistic-render</div>
+<div style="background:#7E2F42;color:#fff;text-align:center;font-size:11px;padding:4px;">build: v10-visible-fetch-errors</div>
 <div class="topbar">
   <div class="brand">ZuvkhunTuund <span>Instagram Ном</span></div>
   <div id="topbarActions"></div>
@@ -269,7 +269,16 @@ function renderTopbar(){
 async function loadMedia(){
   try{
     const res = await fetch('/.netlify/functions/instagram-media');
-    if(!res.ok){ return; }
+    if(!res.ok){
+      let msg = `Алдааны код: ${res.status}`;
+      try{
+        const errData = await res.json();
+        if(errData.error) msg = errData.error;
+      }catch(e2){}
+      showDebugError(`Зураг татахад алдаа гарлаа: ${msg}`);
+      toast('Зураг татаж чадсангүй — доор дэлгэрэнгүй үзнэ үү');
+      return;
+    }
     const data = await res.json();
     state.media = data.media || [];
     state.connected = true;
@@ -278,7 +287,10 @@ async function loadMedia(){
     document.getElementById('controls').style.display = 'flex';
     document.getElementById('exportBar').style.display = 'flex';
     if(state.pages.length === 0) addDefaultPages();
-  }catch(e){ console.error(e); }
+  }catch(e){
+    console.error(e);
+    showDebugError(`Сүлжээний алдаа: ${e.message}`);
+  }
 }
 
 function renderPool(){
