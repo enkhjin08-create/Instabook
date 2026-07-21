@@ -177,7 +177,7 @@
 </head>
 <body>
 
-<div style="background:#7E2F42;color:#fff;text-align:center;font-size:11px;padding:4px;">build: v8-page-data-dump</div>
+<div style="background:#7E2F42;color:#fff;text-align:center;font-size:11px;padding:4px;">build: v9-sync-optimistic-render</div>
 <div class="topbar">
   <div class="brand">ZuvkhunTuund <span>Instagram Ном</span></div>
   <div id="topbarActions"></div>
@@ -399,31 +399,25 @@ function renderBook(){
       if(!coverEl || !id) return;
       const m = findMedia(id);
       const primary = m ? (m.thumbnail_url || m.media_url || '') : '';
-      const fallback = m ? (m.media_url || '') : '';
       const markBroken = (reason)=>{
+        if(!document.contains(coverEl)) return; // хуудас аль хэдийн солигдсон бол хийхгүй
         coverEl.classList.add('broken');
         coverEl.textContent = `⚠️ Зураг ачаалагдсангүй\nID: ${id}\n${reason}`;
       };
       if(!m){ markBroken('Энэ зураг Instagram-ийн жагсаалтад олдсонгүй (устсан эсвэл шинэчлэлт хэрэгтэй)'); return; }
       if(!primary){ markBroken('Instagram-аас ямар ч зургийн холбоос ирээгүй'); return; }
+
+      // Шууд, хойшлуулалгүйгээр тавина (optimistic) — ихэнх зураг шууд харагдана
+      coverEl.style.backgroundImage = `url("${primary}")`;
+
+      // Арын дэвсгэрт баталгаажуулж, үнэхээр эвдэрсэн бол л дараа нь тэмдэглэнэ
       const p1 = new Promise(resolve=>{
         let settled = false;
         const done = (fn)=>{ if(settled) return; settled = true; clearTimeout(timer); fn(); resolve(); };
-        const timer = setTimeout(()=>{
-          done(()=> markBroken(`Хугацаа хэтэрлээ (8 сек хариу ирсэнгүй)\nURL: ${primary.slice(0,60)}...`));
-        }, 8000);
+        const timer = setTimeout(()=> done(()=>{}), 8000); // хугацаа хэтэрвэл зүгээр орхино, broken гэж тэмдэглэхгүй
         const test = new Image();
-        test.onload = ()=>{ done(()=>{ coverEl.style.backgroundImage = `url("${primary}")`; }); };
-        test.onerror = ()=>{
-          if(fallback && fallback !== primary){
-            const test2 = new Image();
-            test2.onload = ()=>{ done(()=>{ coverEl.style.backgroundImage = `url("${fallback}")`; }); };
-            test2.onerror = ()=>{ done(()=> markBroken('Хоёр холбоос (thumbnail болон эх зураг) ачаалагдсангүй')); };
-            test2.src = fallback;
-          } else {
-            done(()=> markBroken('Зургийн холбоос ачаалагдсангүй'));
-          }
-        };
+        test.onload = ()=> done(()=>{});
+        test.onerror = ()=> done(()=> markBroken('Зургийн холбоос ачаалагдсангүй (Instagram талын алдаа байж болно)'));
         test.src = primary;
       });
       imgPromises.push(p1);
