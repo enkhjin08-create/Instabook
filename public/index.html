@@ -493,7 +493,8 @@ function renderBook(){
       if(!primary){ markBroken('Instagram-аас ямар ч зургийн холбоос ирээгүй'); return; }
 
       // Зургийн санд ашигласантай яг адил — шууд src тавина
-      coverEl.src = primary;
+      coverEl.src = `/.netlify/functions/image-proxy?url=${encodeURIComponent(primary)}`;
+      coverEl.crossOrigin = 'anonymous';
 
       const p1 = new Promise(resolve=>{
         let settled = false;
@@ -681,7 +682,17 @@ async function exportPdf(mode){
       state.activePage = i;
       await renderBook(); // зураг бүрэн ачаалагдахыг жинхэнээр хүлээнэ
       const node = document.getElementById('pdfPage');
-      const canvas = await html2canvas(node, { scale: isPrint ? 2.5 : 1.5, useCORS:true, backgroundColor:null });
+      let canvas;
+      try{
+        canvas = await Promise.race([
+          html2canvas(node, { scale: isPrint ? 2.5 : 1.5, useCORS:true, backgroundColor:null }),
+          new Promise((_, reject)=> setTimeout(()=> reject(new Error('timeout')), 20000)),
+        ]);
+      }catch(pageErr){
+        console.error(`Page ${i+1} canvas error:`, pageErr);
+        setTabProgress(`Хуудас ${i+1} дээр асуудал гарлаа, алгасаж байна...`);
+        continue; // энэ хуудсыг алгасаад үргэлжлүүлнэ
+      }
       const img = canvas.toDataURL('image/jpeg', 0.92);
       if(i>0) pdf.addPage('a5','portrait');
       pdf.addImage(img, 'JPEG', 0, 0, 148, 210);
