@@ -372,10 +372,8 @@ function renderBook(){
   } else {
     const slots = p.photos.map((id,idx)=>{
       const m = id ? findMedia(id) : null;
-      const primary = m ? (m.media_url || m.thumbnail_url || '') : '';
-      const fallback = m ? (m.thumbnail_url || '') : '';
       return `<div class="dropslot" data-idx="${idx}" style="height:100%;">
-        ${m ? `<div class="cover-img" data-primary="${primary}" data-fallback="${fallback}" style="background-image:url('${primary}')"></div>` : `<div class="empty-slot">Зураг сонгоод энд дар</div>`}
+        ${m ? `<div class="cover-img"></div>` : `<div class="empty-slot">Зураг сонгоод энд дар</div>`}
       </div>`;
     }).join('');
     inner = `
@@ -388,26 +386,39 @@ function renderBook(){
 
   area.innerHTML = `<div class="book-wrap"><div class="book"><div class="spine"></div>${inner}</div></div>`;
 
-  // background-image нь <img>-ийн адил onerror дэмждэггүй тул JS-ээр урьдчилан
-  // ачааллаж шалгаад, эвдэрсэн бол thumbnail_url руу сольж, эсвэл тодорхой
-  // харагдах "эвдэрсэн" төлөвт оруулна (blank цагаан хэзээ ч гарахгүй байх)
-  area.querySelectorAll('.cover-img').forEach(el=>{
-    const primary = el.dataset.primary;
-    const fallback = el.dataset.fallback;
-    if(!primary) { el.classList.add('broken'); return; }
-    const test = new Image();
-    test.onerror = ()=>{
-      if(fallback && fallback !== primary){
-        el.style.backgroundImage = `url('${fallback}')`;
-        const test2 = new Image();
-        test2.onerror = ()=> el.classList.add('broken');
-        test2.src = fallback;
-      } else {
-        el.classList.add('broken');
-      }
-    };
-    test.src = primary;
-  });
+  // Зургийн URL-ыг HTML attribute болгож шигтгэхийн оронд (тэмдэгтийн
+  // асуудлаас болж чимээгүй эвдэрч болдог байсан), state-ээс шууд уншиж
+  // JS property-аар (innerHTML-гүйгээр) аюулгүй тавина.
+  const imgPromises = [];
+  if(p.layout !== 'cover'){
+    area.querySelectorAll('.dropslot').forEach(slot=>{
+      const idx = parseInt(slot.dataset.idx);
+      const id = p.photos[idx];
+      const coverEl = slot.querySelector('.cover-img');
+      if(!coverEl || !id) return;
+      const m = findMedia(id);
+      const primary = m ? (m.thumbnail_url || m.media_url || '') : '';
+      const fallback = m ? (m.media_url || '') : '';
+      if(!primary){ coverEl.classList.add('broken'); return; }
+      const p1 = new Promise(resolve=>{
+        const test = new Image();
+        test.onload = ()=>{ coverEl.style.backgroundImage = `url("${primary}")`; resolve(); };
+        test.onerror = ()=>{
+          if(fallback && fallback !== primary){
+            const test2 = new Image();
+            test2.onload = ()=>{ coverEl.style.backgroundImage = `url("${fallback}")`; resolve(); };
+            test2.onerror = ()=>{ coverEl.classList.add('broken'); resolve(); };
+            test2.src = fallback;
+          } else {
+            coverEl.classList.add('broken');
+            resolve();
+          }
+        };
+        test.src = primary;
+      });
+      imgPromises.push(p1);
+    });
+  }
 
   // Instagram-ийн анхны бичвэрийг дахин татаж ашиглах товч (зөвхөн 1 зурагтай
   // layout-д, PDF-д ороогүй #pdfPage-ийн гадна тул export хийхэд харагдахгүй)
@@ -458,6 +469,8 @@ function renderBook(){
   if(capInput){
     capInput.addEventListener('blur', ()=>{ p.caption = capInput.textContent.trim(); });
   }
+
+  return Promise.all(imgPromises);
 }
 
 function renderAll(){
@@ -480,7 +493,14 @@ function autoBuildBook(){
   // хамгийн эхний (хамгийн хуучин) зураг номны эхний хуудас болгохын тулд
   // огноогоор өсөх дараалалд эрэмбэлнэ
   const orderedMedia = [...state.media].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  let skipped = 0;
   orderedMedia.forEach(m=>{
+    // Ямар ч зургийн URL байхгүй бол (Instagram талын алдаа) хуудас үүсгэхгүй,
+    // хоосон хуудас гарахаас сэргийлнэ
+    if(!m.thumbnail_url && !m.media_url){
+      skipped++;
+      return;
+    }
     state.pages.push({
       layout:'grid1',
       photos:[m.id],
@@ -491,7 +511,10 @@ function autoBuildBook(){
   state.activePage = 1;
   state.selectedPhotoId = null;
   renderAll();
-  toast(`${state.media.length} зурагтай ном үүслээ!`);
+  if(skipped > 0){
+    setTimeout(()=> window.alert(`${skipped} зурагт Instagram-аас зургийн холбоос ирээгүй тул хуудас үүсгэлгүй алгаслаа. Эдгээрийг дараа нь гараар нэмж болно.`), 300);
+  }
+  toast(`${state.media.length - skipped} зурагтай ном үүслээ!`);
 }
 
 document.getElementById('layoutSeg').addEventListener('click', e=>{
@@ -543,8 +566,7 @@ async function exportPdf(mode){
       toast(progressText);
       setTabProgress(progressText);
       state.activePage = i;
-      renderBook();
-      await new Promise(r=>setTimeout(r,60)); // цаг өгч зураг ачаалуулах
+      await renderBook(); // зураг бүрэн ачаалагдахыг жинхэнээр хүлээнэ
       const node = document.getElementById('pdfPage');
       const canvas = await html2canvas(node, { scale: isPrint ? 2.5 : 1.5, useCORS:true, backgroundColor:null });
       const img = canvas.toDataURL('image/jpeg', 0.92);
