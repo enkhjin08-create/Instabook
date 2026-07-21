@@ -128,8 +128,8 @@
     background-image:none !important;
     display:flex;align-items:center;justify-content:center;
     background:repeating-linear-gradient(45deg,#eee0cc,#eee0cc 8px,#f5ead9 8px,#f5ead9 16px);
+    font-size:11px;color:#9c5252;text-align:center;padding:14px;white-space:pre-line;line-height:1.5;
   }
-  .cover-img.broken::after{content:'Зураг ачаалагдсангүй — 🔄 дахин ачаалж үзнэ үү';font-size:11px;color:#9c8262;text-align:center;padding:10px;}
   .page-caption{
     font-family:'Cormorant Garamond',serif;font-style:italic;font-size:14px;color:var(--ink-soft);
     text-align:center;margin-top:12px;padding:0 6px;
@@ -399,7 +399,12 @@ function renderBook(){
       const m = findMedia(id);
       const primary = m ? (m.thumbnail_url || m.media_url || '') : '';
       const fallback = m ? (m.media_url || '') : '';
-      if(!primary){ coverEl.classList.add('broken'); return; }
+      const markBroken = (reason)=>{
+        coverEl.classList.add('broken');
+        coverEl.textContent = `⚠️ Зураг ачаалагдсангүй\nID: ${id}\n${reason}`;
+      };
+      if(!m){ markBroken('Энэ зураг Instagram-ийн жагсаалтад олдсонгүй (устсан эсвэл шинэчлэлт хэрэгтэй)'); return; }
+      if(!primary){ markBroken('Instagram-аас ямар ч зургийн холбоос ирээгүй'); return; }
       const p1 = new Promise(resolve=>{
         const test = new Image();
         test.onload = ()=>{ coverEl.style.backgroundImage = `url("${primary}")`; resolve(); };
@@ -407,10 +412,10 @@ function renderBook(){
           if(fallback && fallback !== primary){
             const test2 = new Image();
             test2.onload = ()=>{ coverEl.style.backgroundImage = `url("${fallback}")`; resolve(); };
-            test2.onerror = ()=>{ coverEl.classList.add('broken'); resolve(); };
+            test2.onerror = ()=>{ markBroken('Хоёр холбоос (thumbnail болон эх зураг) ачаалагдсангүй'); resolve(); };
             test2.src = fallback;
           } else {
-            coverEl.classList.add('broken');
+            markBroken('Зургийн холбоос ачаалагдсангүй');
             resolve();
           }
         };
