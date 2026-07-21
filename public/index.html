@@ -177,7 +177,6 @@
 </head>
 <body>
 
-<div style="background:#7E2F42;color:#fff;text-align:center;font-size:11px;padding:4px;">build: v11-img-tag-like-pool</div>
 <div class="topbar">
   <div class="brand">ZuvkhunTuund <span>Instagram Ном</span></div>
   <div id="topbarActions"></div>
@@ -223,7 +222,15 @@
         <button data-l="grid1">1 зураг + бичвэр</button>
       </div>
       <button class="btn ghost" id="addPageBtn">+ Хуудас нэмэх</button>
-      <button class="btn gold" id="autoBuildBtn">✨ Бүх зургаар автоматаар үүсгэх</button>
+    </div>
+
+    <div class="controls-row" id="dateRangeRow" style="display:none;">
+      <label style="font-size:12px;color:var(--ink-soft);">Хугацаа:</label>
+      <input type="date" id="dateFrom" style="border:1px solid #e6dcc9;border-radius:8px;padding:6px 8px;font-size:12.5px;background:var(--paper);" />
+      <span style="color:var(--ink-soft);font-size:12px;">–</span>
+      <input type="date" id="dateTo" style="border:1px solid #e6dcc9;border-radius:8px;padding:6px 8px;font-size:12.5px;background:var(--paper);" />
+      <button class="btn ghost" id="clearDateBtn" style="font-size:11.5px;padding:6px 12px;">Цэвэрлэх</button>
+      <button class="btn gold" id="autoBuildBtn">✨ Сонгосон зургаар үүсгэх</button>
     </div>
 
     <div id="pagesRail" class="pages-rail"></div>
@@ -285,6 +292,7 @@ async function loadMedia(){
     renderTopbar();
     renderPool();
     document.getElementById('controls').style.display = 'flex';
+    document.getElementById('dateRangeRow').style.display = 'flex';
     document.getElementById('exportBar').style.display = 'flex';
     if(state.pages.length === 0) addDefaultPages();
   }catch(e){
@@ -486,25 +494,6 @@ function renderBook(){
     capInput.addEventListener('blur', ()=>{ p.caption = capInput.textContent.trim(); });
   }
 
-  // Оношилгооны мэдээлэл — тухайн хуудасны бодит өгөгдлийг харуулна
-  if(p.layout !== 'cover'){
-    const dbg = document.createElement('pre');
-    dbg.style.cssText = 'font-size:10px;background:#2b2420;color:#9fd88a;padding:10px;margin:10px 20px;border-radius:6px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;';
-    const lines = [`layout: ${p.layout}`, `photos: ${JSON.stringify(p.photos)}`];
-    p.photos.forEach((id,i)=>{
-      const m = id ? findMedia(id) : null;
-      lines.push(`[${i}] id=${id}`);
-      lines.push(`  found in state.media: ${!!m}`);
-      if(m){
-        lines.push(`  thumbnail_url: ${m.thumbnail_url || '(байхгүй)'}`);
-        lines.push(`  media_url: ${m.media_url || '(байхгүй)'}`);
-      }
-    });
-    lines.push(`state.media.length: ${state.media.length}`);
-    dbg.textContent = lines.join('\n');
-    area.appendChild(dbg);
-  }
-
   return Promise.all(imgPromises);
 }
 
@@ -519,7 +508,30 @@ function autoBuildBook(){
     toast('Эхлээд Instagram зургаа ачаалуулна уу');
     return;
   }
-  const confirmMsg = 'Одоо байгаа хуудсууд арилж, Instagram-ийн бүх зурагт тус бүр "1 зураг + бичвэр" хуудас автоматаар үүснэ. Үргэлжлүүлэх үү?';
+
+  const fromVal = document.getElementById('dateFrom').value;
+  const toVal = document.getElementById('dateTo').value;
+  const fromDate = fromVal ? new Date(fromVal + 'T00:00:00') : null;
+  const toDate = toVal ? new Date(toVal + 'T23:59:59') : null;
+
+  let filteredMedia = state.media;
+  if(fromDate || toDate){
+    filteredMedia = state.media.filter(m=>{
+      const t = new Date(m.timestamp);
+      if(fromDate && t < fromDate) return false;
+      if(toDate && t > toDate) return false;
+      return true;
+    });
+    if(filteredMedia.length === 0){
+      window.alert('Сонгосон хугацаанд зураг олдсонгүй. Хугацаагаа өөрчилж үзнэ үү.');
+      return;
+    }
+  }
+
+  const rangeText = (fromDate || toDate)
+    ? `сонгосон хугацааны ${filteredMedia.length} зурагт`
+    : `Instagram-ийн бүх ${filteredMedia.length} зурагт`;
+  const confirmMsg = `Одоо байгаа хуудсууд арилж, ${rangeText} тус бүр "1 зураг + бичвэр" хуудас автоматаар үүснэ. Үргэлжлүүлэх үү?`;
   if(!window.confirm(confirmMsg)) return;
 
   state.usedIds = new Set();
@@ -527,7 +539,7 @@ function autoBuildBook(){
   // Instagram API зургуудыг шинэ→хуучин дарааллаар буцаадаг тул,
   // хамгийн эхний (хамгийн хуучин) зураг номны эхний хуудас болгохын тулд
   // огноогоор өсөх дараалалд эрэмбэлнэ
-  const orderedMedia = [...state.media].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const orderedMedia = [...filteredMedia].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
   let skipped = 0;
   orderedMedia.forEach(m=>{
     // Ямар ч зургийн URL байхгүй бол (Instagram талын алдаа) хуудас үүсгэхгүй,
@@ -549,7 +561,7 @@ function autoBuildBook(){
   if(skipped > 0){
     setTimeout(()=> window.alert(`${skipped} зурагт Instagram-аас зургийн холбоос ирээгүй тул хуудас үүсгэлгүй алгаслаа. Эдгээрийг дараа нь гараар нэмж болно.`), 300);
   }
-  toast(`${state.media.length - skipped} зурагтай ном үүслээ!`);
+  toast(`${orderedMedia.length - skipped} зурагтай ном үүслээ!`);
 }
 
 document.getElementById('layoutSeg').addEventListener('click', e=>{
@@ -559,6 +571,10 @@ document.getElementById('layoutSeg').addEventListener('click', e=>{
 });
 document.getElementById('addPageBtn').addEventListener('click', addPage);
 document.getElementById('autoBuildBtn').addEventListener('click', autoBuildBook);
+document.getElementById('clearDateBtn').addEventListener('click', ()=>{
+  document.getElementById('dateFrom').value = '';
+  document.getElementById('dateTo').value = '';
+});
 
 // ---- PDF export ----
 async function exportPdf(mode){
