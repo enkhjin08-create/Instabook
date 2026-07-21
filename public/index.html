@@ -67,6 +67,7 @@
   }
   .pool-item img{width:100%;height:100%;object-fit:cover;display:block;}
   .pool-item.used{opacity:.35;}
+  .pool-item.broken{opacity:.3;background:repeating-linear-gradient(45deg,#eee0cc,#eee0cc 6px,#f5ead9 6px,#f5ead9 12px);}
   .pool-item.selected{border-color:var(--rose-deep);box-shadow:0 0 0 2px var(--rose-deep) inset;}
   .pool-item .tick{
     position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;
@@ -122,7 +123,7 @@
   .page-photos.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;flex:1;}
   .page-photos.grid1{display:flex;flex:1;}
   .page-photos img{width:100%;height:100%;object-fit:cover;border-radius:4px;}
-  .cover-img{width:100%;height:100%;border-radius:4px;background-size:cover;background-position:center;background-repeat:no-repeat;}
+  .cover-img{width:100%;height:100%;border-radius:4px;background-size:cover;background-position:center;background-repeat:no-repeat;background-color:#eee0cc;}
   .page-caption{
     font-family:'Cormorant Garamond',serif;font-style:italic;font-size:14px;color:var(--ink-soft);
     text-align:center;margin-top:12px;padding:0 6px;
@@ -203,6 +204,7 @@
   <div class="pool" id="pool">
     <h3>Зургийн сан</h3>
     <p class="hint">Зургаа дараад сонгоод, дараа нь хуудасны нүдэн дээр дарж тавина уу.</p>
+    <button class="btn ghost" id="refreshMediaBtn" style="font-size:11.5px;padding:6px 12px;margin-bottom:12px;">🔄 Зураг дахин ачаалах</button>
     <div id="poolGrid" class="pool-grid"></div>
     <div class="select-banner" id="selectBanner">Сонгосон зураг ✓ — одоо хуудасны нүдэн дээр дарна уу</div>
   </div>
@@ -282,7 +284,8 @@ function renderPool(){
   }
   grid.innerHTML = state.media.map(m => `
     <div class="pool-item ${state.usedIds.has(m.id)?'used':''} ${state.selectedPhotoId===m.id?'selected':''}" data-id="${m.id}">
-      <img src="${m.thumbnail_url || m.media_url}" />
+      <img src="${m.thumbnail_url || m.media_url}" loading="lazy" decoding="async"
+           onerror="this.onerror=null; if(this.src!=='${m.media_url}'){this.src='${m.media_url}';} else {this.parentElement.classList.add('broken');}" />
       ${state.usedIds.has(m.id) ? '<div class="tick">✓</div>' : ''}
     </div>
   `).join('');
@@ -539,6 +542,12 @@ document.getElementById('closeModal').addEventListener('click', ()=>{
 });
 document.getElementById('howToModal').addEventListener('click', e=>{
   if(e.target.id === 'howToModal') e.target.classList.remove('show');
+});
+document.getElementById('refreshMediaBtn').addEventListener('click', async ()=>{
+  toast('Зураг дахин ачаалж байна...');
+  await loadMedia();
+  renderAll();
+  toast('Шинэчлэгдлээ!');
 });
 
 // ---- init ----
