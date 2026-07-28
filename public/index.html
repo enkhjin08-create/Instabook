@@ -244,9 +244,24 @@
     <div id="pagesRail" class="pages-rail"></div>
     <div id="bookArea"></div>
 
+    <!-- Захиалагчийн урсгал: PDF шууд үүсгэхийн оронд захиалга илгээнэ -->
+    <div id="orderForm" class="export-bar" style="display:none;flex-direction:column;align-items:stretch;gap:10px;max-width:380px;margin:0 auto;">
+      <input type="text" id="orderName" placeholder="Нэр (заавал биш)" style="border:1px solid #e6dcc9;border-radius:8px;padding:10px 12px;font-size:13.5px;background:var(--paper);" />
+      <input type="tel" id="orderPhone" placeholder="Утасны дугаар *" style="border:1px solid #e6dcc9;border-radius:8px;padding:10px 12px;font-size:13.5px;background:var(--paper);" />
+      <input type="text" id="orderAddress" placeholder="Хүргэлтийн хаяг" style="border:1px solid #e6dcc9;border-radius:8px;padding:10px 12px;font-size:13.5px;background:var(--paper);" />
+      <button class="btn gold" id="submitOrderBtn">📩 Захиалга илгээх</button>
+    </div>
+    <div id="orderSuccess" style="display:none;text-align:center;padding:30px 20px;">
+      <div style="font-size:32px;margin-bottom:10px;">✅</div>
+      <h3 style="font-family:'Playfair Display',serif;color:var(--rose-deep);margin:0 0 8px;">Захиалга хүлээн авлаа!</h3>
+      <p style="color:var(--ink-soft);font-size:13.5px;">Бид тантай удахгүй холбогдох болно. Баярлалаа 💌</p>
+    </div>
+
+    <!-- Admin урсгал: захиалгаас нээгдсэн үед л харагдана -->
     <div id="exportBar" class="export-bar" style="display:none;">
       <button class="btn gold" id="exportPrint">📖 Хэвлэхэд бэлэн PDF (A5)</button>
       <button class="btn ghost" id="exportDigital">📱 Дижитал PDF</button>
+      <button class="btn ghost" id="markDoneBtn">✅ Дуусгах</button>
     </div>
   </div>
 
@@ -270,6 +285,8 @@ const state = {
   activePage: 0,
   selectedPhotoId: null, // тухайн үед "сонгогдсон" зураг — дараагийн товшилтоор хуудсанд байрлана
   openPoolGroups: new Set(), // сар бүрийн групп дэлгэгдсэн эсэх
+  isAdminMode: false,
+  adminPin: null,
 };
 
 function toast(msg){
@@ -304,13 +321,33 @@ async function loadMedia(){
       return;
     }
     const data = await res.json();
-    state.media = data.media || [];
+    const rawMedia = data.media || [];
+    // CAROUSEL_ALBUM зургуудын дэд-зургуудыг тусад нь хайж олдог (findMedia)
+    // болгохын тулд, синтетик ID-тай state.media-д нэмнэ. isChild:true гэж
+    // тэмдэглэснээр зургийн санд давхардуулж харуулахгүй.
+    const expanded = [];
+    rawMedia.forEach(m=>{
+      expanded.push(m);
+      if(m.children && m.children.length > 1){
+        m.children.forEach((c, idx)=>{
+          expanded.push({
+            id: `${m.id}_c${idx}`,
+            media_url: c.media_url,
+            thumbnail_url: c.thumbnail_url,
+            caption: m.caption,
+            timestamp: m.timestamp,
+            isChild: true,
+          });
+        });
+      }
+    });
+    state.media = expanded;
     state.connected = true;
     renderTopbar();
     renderPool();
     document.getElementById('controls').style.display = 'flex';
     document.getElementById('dateRangeRow').style.display = 'flex';
-    document.getElementById('exportBar').style.display = 'flex';
+    document.getElementById('orderForm').style.display = 'flex';
     if(state.pages.length === 0) addDefaultPages();
   }catch(e){
     console.error(e);
@@ -333,6 +370,7 @@ function renderPool(){
   // энэ мөр дарааллаар групп үүсгэхэд автоматаар шинэ сар нь эхэнд ирнэ)
   const groups = new Map(); // key -> {label, items:[]}
   state.media.forEach(m=>{
+    if(m.isChild) return; // дэд-зургийг зургийн санд тусад нь харуулахгүй
     const d = new Date(m.timestamp);
     const key = `${d.getFullYear()}-${d.getMonth()}`;
     if(!groups.has(key)){
@@ -577,7 +615,7 @@ function autoBuildBook(){
   const fromDate = fromVal ? new Date(fromVal + 'T00:00:00') : null;
   const toDate = toVal ? new Date(toVal + 'T23:59:59') : null;
 
-  let filteredMedia = state.media;
+  let filteredMedia = state.media.filter(m => !m.isChild);
   if(fromDate || toDate){
     filteredMedia = state.media.filter(m=>{
       const t = new Date(m.timestamp);
@@ -611,12 +649,24 @@ function autoBuildBook(){
       skipped++;
       return;
     }
-    state.pages.push({
-      layout:'grid1',
-      photos:[m.id],
-      caption: shortenCaption(m.caption || ''),
-    });
-    state.usedIds.add(m.id);
+    if(m.children && m.children.length > 1){
+      // Олон зурагтай пост (carousel) — бүх дэд-зургийг collage хуудас болгоно
+      const childIds = m.children.map((c, idx)=> `${m.id}_c${idx}`);
+      const photos = [0,1,2,3].map(i => childIds[i] || null);
+      state.pages.push({
+        layout:'grid2',
+        photos,
+        caption: shortenCaption(m.caption || ''),
+      });
+      childIds.forEach(id => state.usedIds.add(id));
+    } else {
+      state.pages.push({
+        layout:'grid1',
+        photos:[m.id],
+        caption: shortenCaption(m.caption || ''),
+      });
+      state.usedIds.add(m.id);
+    }
   });
   state.activePage = 1;
   state.selectedPhotoId = null;
@@ -724,6 +774,71 @@ async function exportPdf(mode){
 document.getElementById('exportPrint').addEventListener('click', ()=>exportPdf('print'));
 document.getElementById('exportDigital').addEventListener('click', ()=>exportPdf('digital'));
 
+document.getElementById('submitOrderBtn').addEventListener('click', async ()=>{
+  const name = document.getElementById('orderName').value.trim();
+  const phone = document.getElementById('orderPhone').value.trim();
+  const address = document.getElementById('orderAddress').value.trim();
+
+  if(!phone){
+    toast('Утасны дугаараа оруулна уу');
+    return;
+  }
+  if(state.pages.length <= 1){ // зөвхөн хавтас байгаа тохиолдол
+    toast('Дор хаяж 1 хуудас нэмнэ үү');
+    return;
+  }
+
+  const btn = document.getElementById('submitOrderBtn');
+  btn.disabled = true;
+  btn.textContent = 'Илгээж байна...';
+
+  // Хуудсанд ашигласан бүх зурган ID-д тохирох Instagram мэдээллийг хавсаргана
+  // (admin дараа нь Instagram холболтгүйгээр PDF үүсгэх боломжтой байхын тулд)
+  const usedIds = new Set();
+  state.pages.forEach(p => (p.photos || []).forEach(id => { if(id) usedIds.add(id); }));
+  const mediaSnapshot = state.media
+    .filter(m => usedIds.has(m.id))
+    .map(m => ({ id:m.id, media_url:m.media_url, thumbnail_url:m.thumbnail_url, caption:m.caption, timestamp:m.timestamp }));
+
+  try{
+    const res = await fetch('/.netlify/functions/order-create', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ customerName:name, phone, address, pages: state.pages, mediaSnapshot }),
+    });
+    if(!res.ok){
+      const errData = await res.json().catch(()=>({}));
+      throw new Error(errData.error || `Алдааны код: ${res.status}`);
+    }
+    document.getElementById('orderForm').style.display = 'none';
+    document.getElementById('orderSuccess').style.display = 'block';
+  }catch(e){
+    console.error(e);
+    toast('Захиалга илгээхэд алдаа гарлаа');
+    showDebugError(`Захиалга илгээхэд алдаа: ${e.message}`);
+  }finally{
+    btn.disabled = false;
+    btn.textContent = '📩 Захиалга илгээх';
+  }
+});
+
+document.getElementById('markDoneBtn').addEventListener('click', async ()=>{
+  const orderId = document.getElementById('markDoneBtn').dataset.orderId;
+  if(!orderId) return;
+  try{
+    const res = await fetch('/.netlify/functions/order-update', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ pin: state.adminPin, id: orderId, status: 'done' }),
+    });
+    if(!res.ok) throw new Error(`Алдааны код: ${res.status}`);
+    toast('Захиалга дууссан гэж тэмдэглэлээ ✓');
+  }catch(e){
+    console.error(e);
+    toast('Шинэчлэхэд алдаа гарлаа');
+  }
+});
+
 document.getElementById('howToLink').addEventListener('click', ()=>{
   document.getElementById('howToModal').classList.add('show');
 });
@@ -763,12 +878,59 @@ window.addEventListener('unhandledrejection', (e)=>{
   showDebugError(`Promise rejection: ${reason}`);
 });
 
+async function loadOrderForAdmin(orderId, pin){
+  try{
+    const res = await fetch(`/.netlify/functions/order-detail?id=${encodeURIComponent(orderId)}&pin=${encodeURIComponent(pin)}`);
+    if(!res.ok){
+      toast(res.status === 401 ? 'PIN буруу байна' : 'Захиалга олдсонгүй');
+      return;
+    }
+    const data = await res.json();
+    const order = data.order;
+    state.pages = order.pages;
+    state.media = order.mediaSnapshot || [];
+    state.activePage = 0;
+    state.connected = true; // Instagram холболт шаардлагагүй, dashboard-ыг л харуулна
+
+    document.getElementById('creatorNotice').style.display = 'none';
+    document.getElementById('pool').style.display = 'none';
+    document.getElementById('controls').style.display = 'none';
+    document.getElementById('dateRangeRow').style.display = 'none';
+    document.getElementById('orderForm').style.display = 'none';
+    document.getElementById('exportBar').style.display = 'flex';
+
+    const banner = document.getElementById('creatorNotice');
+    banner.style.display = 'flex';
+    banner.innerHTML = `<div class="icon">📋</div><div>
+      Захиалга: <strong>${order.customerName || '(нэргүй)'}</strong> — ${order.phone}
+      ${order.address ? ' — ' + order.address : ''}
+      <br/>Статус: <strong>${order.status}</strong> · ${order.pageCount} хуудас
+    </div>`;
+
+    document.getElementById('markDoneBtn').dataset.orderId = order.id;
+    renderAll();
+    renderTopbar();
+  }catch(e){
+    console.error(e);
+    showDebugError(`Захиалга ачаалахад алдаа: ${e.message}`);
+  }
+}
+
 (function init(){
   renderTopbar();
   const params = new URLSearchParams(window.location.search);
   if(params.get('error')) toast(params.get('error'));
-  // Cookie тавигдсан эсэхийг шалгахын оронд шууд media татаж үзнэ;
-  // 401 ирвэл холбогдоогүй гэсэн үг тул анхны байдлаараа үлдэнэ.
+
+  const orderId = params.get('orderId');
+  const pin = params.get('pin');
+  if(orderId && pin){
+    state.isAdminMode = true;
+    state.adminPin = pin;
+    loadOrderForAdmin(orderId, pin);
+    return;
+  }
+
+  // Захиалагчийн энгийн урсгал — Instagram холбож зураг сонгоно
   loadMedia().then(()=>{
     if(state.connected){
       document.getElementById('creatorNotice').style.display = 'none';
