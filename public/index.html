@@ -129,7 +129,7 @@
   .spine{width:14px;background:linear-gradient(90deg,#00000022,#00000000 40%,#00000000 60%,#00000022);}
   .page{
     width:340px;height:480px;background:var(--paper);position:relative;padding:22px;
-    display:flex;flex-direction:column;
+    display:flex;flex-direction:column;overflow:hidden;
   }
   .page.cover{
     background:linear-gradient(160deg,var(--rose-deep),#5c1f2e);color:#fff;
@@ -139,13 +139,15 @@
   .page.cover .sub{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:15px;color:#e9c9c9;}
   .page.cover .gold-line{width:50px;height:2px;background:var(--gold);margin:16px auto;}
 
-  .page-photos.grid2{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:8px;flex:1;}
-  .page-photos.collage-2{display:grid;grid-template-columns:1fr;grid-template-rows:1fr 1fr;gap:8px;flex:1;}
-  .page-photos.collage-3{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:8px;flex:1;}
+  .page-photos{min-height:0;} /* flex item дотор агуулгын хэмжээгээр өсөхөөс сэргийлнэ */
+  .page-photos.grid2{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:8px;flex:1;min-height:0;}
+  .page-photos.collage-2{display:grid;grid-template-columns:1fr;grid-template-rows:1fr 1fr;gap:8px;flex:1;min-height:0;}
+  .page-photos.collage-3{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:8px;flex:1;min-height:0;}
   .page-photos.collage-3 > *:first-child{grid-column:1 / 3;}
-  .page-photos.grid1{display:flex;flex:1;}
+  .page-photos.grid1{display:flex;flex:1;min-height:0;}
   .page-photos img{width:100%;height:100%;object-fit:cover;border-radius:4px;}
-  .cover-img{width:100%;height:100%;border-radius:4px;object-fit:cover;object-position:50% 25%;display:block;background-color:#eee0cc;}
+  .dropslot{min-height:0;min-width:0;overflow:hidden;}
+  .cover-img{width:100%;height:100%;border-radius:4px;object-fit:cover;object-position:50% 25%;display:block;background-color:#eee0cc;min-height:0;min-width:0;}
   .cover-img.broken{
     background-image:none !important;
     display:flex;align-items:center;justify-content:center;
