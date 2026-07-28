@@ -52,6 +52,8 @@
   .layout{display:grid;grid-template-columns:300px 1fr;min-height:calc(100vh - 66px);}
   .layout .pool{order:1;}
   .layout .workspace{order:2;}
+  .layout.admin-mode{grid-template-columns:1fr;}
+  .layout.admin-mode .workspace{grid-column:1/-1;max-width:900px;margin:0 auto;width:100%;}
   @media(max-width:900px){
     .layout{grid-template-columns:1fr;}
     .layout .pool{order:2;}
@@ -893,6 +895,7 @@ async function loadOrderForAdmin(orderId, pin){
     state.connected = true; // Instagram холболт шаардлагагүй, dashboard-ыг л харуулна
 
     document.getElementById('creatorNotice').style.display = 'none';
+    document.querySelector('.layout').classList.add('admin-mode');
     document.getElementById('pool').style.display = 'none';
     document.getElementById('controls').style.display = 'none';
     document.getElementById('dateRangeRow').style.display = 'none';
