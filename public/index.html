@@ -500,7 +500,7 @@ function renderBook(){
     inner = `
       <div class="page" id="pdfPage">
         <div class="page-photos ${p.layout==='grid1'?'grid1':'grid2'}">${slots}</div>
-        ${p.layout==='grid1' ? `<div class="page-caption" contenteditable="true" id="captionInput">${p.caption || 'Энд бичвэрээ бичнэ үү...'}</div>` : ''}
+        <div class="page-caption" contenteditable="true" id="captionInput">${p.caption || 'Энд бичвэрээ бичнэ үү...'}</div>
         <div class="page-num">${state.activePage}</div>
       </div>`;
   }
@@ -547,7 +547,7 @@ function renderBook(){
 
   // Instagram-ийн анхны бичвэрийг дахин татаж ашиглах товч (зөвхөн 1 зурагтай
   // layout-д, PDF-д ороогүй #pdfPage-ийн гадна тул export хийхэд харагдахгүй)
-  if(p.layout === 'grid1' && p.photos[0]){
+  if(p.layout !== 'cover' && p.photos[0]){
     const m = findMedia(p.photos[0]);
     if(m && m.caption){
       const igBtn = document.createElement('div');
