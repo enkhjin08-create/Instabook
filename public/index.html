@@ -743,8 +743,8 @@ async function exportPdf(mode){
       let canvas;
       try{
         canvas = await Promise.race([
-          html2canvas(node, { scale: isPrint ? 4 : 2, useCORS:true, backgroundColor:null }),
-          new Promise((_, reject)=> setTimeout(()=> reject(new Error('timeout')), 20000)),
+          html2canvas(node, { scale: isPrint ? 6 : 2, useCORS:true, backgroundColor:null, imageTimeout:0 }),
+          new Promise((_, reject)=> setTimeout(()=> reject(new Error('timeout')), 35000)),
         ]);
       }catch(pageErr){
         console.error(`Page ${i+1} canvas error:`, pageErr);
