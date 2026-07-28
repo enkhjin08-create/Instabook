@@ -136,7 +136,7 @@
   .page.cover .sub{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:15px;color:#e9c9c9;}
   .page.cover .gold-line{width:50px;height:2px;background:var(--gold);margin:16px auto;}
 
-  .page-photos.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;flex:1;}
+  .page-photos.grid2{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:8px;flex:1;}
   .page-photos.grid1{display:flex;flex:1;}
   .page-photos img{width:100%;height:100%;object-fit:cover;border-radius:4px;}
   .cover-img{width:100%;height:100%;border-radius:4px;object-fit:cover;display:block;background-color:#eee0cc;}
@@ -519,7 +519,7 @@ function renderBook(){
       const coverEl = slot.querySelector('.cover-img');
       if(!coverEl || !id) return;
       const m = findMedia(id);
-      const primary = m ? (m.thumbnail_url || m.media_url || '') : '';
+      const primary = m ? (m.media_url || m.thumbnail_url || '') : '';
       const markBroken = (reason)=>{
         if(!document.contains(coverEl)) return; // хуудас аль хэдийн солигдсон бол хийхгүй
         const box = document.createElement('div');
@@ -652,7 +652,7 @@ function autoBuildBook(){
     if(m.children && m.children.length > 1){
       // Олон зурагтай пост (carousel) — бүх дэд-зургийг collage хуудас болгоно
       const childIds = m.children.map((c, idx)=> `${m.id}_c${idx}`);
-      const photos = [0,1,2,3].map(i => childIds[i] || null);
+      const photos = childIds; // яг байгаа тоогоор нь, хоосон нүд нэмэхгүй
       state.pages.push({
         layout:'grid2',
         photos,
@@ -735,7 +735,7 @@ async function exportPdf(mode){
       let canvas;
       try{
         canvas = await Promise.race([
-          html2canvas(node, { scale: isPrint ? 2.5 : 1.5, useCORS:true, backgroundColor:null }),
+          html2canvas(node, { scale: isPrint ? 3 : 2, useCORS:true, backgroundColor:null }),
           new Promise((_, reject)=> setTimeout(()=> reject(new Error('timeout')), 20000)),
         ]);
       }catch(pageErr){
@@ -743,7 +743,7 @@ async function exportPdf(mode){
         setTabProgress(`Хуудас ${i+1} дээр асуудал гарлаа, алгасаж байна...`);
         continue; // энэ хуудсыг алгасаад үргэлжлүүлнэ
       }
-      const img = canvas.toDataURL('image/jpeg', 0.92);
+      const img = canvas.toDataURL('image/jpeg', 0.96);
       if(i>0) pdf.addPage('a5','portrait');
       pdf.addImage(img, 'JPEG', 0, 0, 148, 210);
     }
