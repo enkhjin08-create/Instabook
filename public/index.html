@@ -617,7 +617,7 @@ function autoBuildBook(){
 
   let filteredMedia = state.media.filter(m => !m.isChild);
   if(fromDate || toDate){
-    filteredMedia = state.media.filter(m=>{
+    filteredMedia = filteredMedia.filter(m=>{
       const t = new Date(m.timestamp);
       if(fromDate && t < fromDate) return false;
       if(toDate && t > toDate) return false;
